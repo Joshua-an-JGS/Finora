@@ -230,14 +230,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               <label className="block text-[11.5px] font-bold text-[#6B7280] uppercase tracking-wider">
                 Sign in as
               </label>
-              <div className="grid grid-cols-2 gap-2 p-1 bg-[#F8F9FA] rounded-[9px] border border-[#E5E7EB]">
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
                   onClick={() => fillNormalRole('operator')}
                   className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'operator'
-                      ? 'bg-[#FFFFFF] text-[#F47721] shadow-xs border border-[#E5E7EB]'
-                      : 'text-[#6B7280] hover:text-[#1F2937]'
+                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
+                      : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
                   }`}
                 >
                   <UserCheck className="w-3.5 h-3.5" />
@@ -248,8 +248,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   onClick={() => fillNormalRole('viewer')}
                   className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'viewer'
-                      ? 'bg-[#FFFFFF] text-[#F47721] shadow-xs border border-[#E5E7EB]'
-                      : 'text-[#6B7280] hover:text-[#1F2937]'
+                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
+                      : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
                   }`}
                 >
                   <UserCheck className="w-3.5 h-3.5" />
