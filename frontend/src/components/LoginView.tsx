@@ -11,6 +11,10 @@ import {
   UserCheck,
   Building,
   User,
+  Copy,
+  Check,
+  CheckCircle2,
+  Key,
 } from 'lucide-react';
 import { apiRequest, setStoredSession } from '../services/api';
 import type { UserProfile } from '../types/payroll';
@@ -54,6 +58,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [resetStep, setResetStep] = useState<'request' | 'confirm'>('request');
+
+  // Emergency Recovery & First-Run Setup Key State
+  const [setupSuccessRecoveryKey, setSetupSuccessRecoveryKey] = useState<string | null>(null);
+  const [copiedRecoveryKey, setCopiedRecoveryKey] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryAdminId, setRecoveryAdminId] = useState('');
+  const [recoveryKeyInput, setRecoveryKeyInput] = useState('');
+  const [recoveryNewPassword, setRecoveryNewPassword] = useState('');
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
+  const [recoveryRotatedKey, setRecoveryRotatedKey] = useState<string | null>(null);
+  const [recoveryCopied, setRecoveryCopied] = useState(false);
 
   // Check whether the installation requires first-time Administrator onboarding
   useEffect(() => {
@@ -206,15 +221,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   const handleInitialSetup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (setupPassword !== setupConfirmPassword) {
-      setError('Passwords do not match. Please verify and try again.');
+    setError(null);
+
+    if (setupFullName.trim().length < 2) {
+      setError('Please enter a valid administrator full name.');
+      return;
+    }
+    if (!setupEmail.includes('@') || !setupEmail.includes('.')) {
+      setError('Please enter a valid corporate email address.');
+      return;
+    }
+    if (setupUsername.trim().length < 3 || setupUsername.includes(' ')) {
+      setError('Username must be at least 3 characters and contain no spaces.');
       return;
     }
     if (setupPassword.length < 8) {
       setError('Administrator password must be at least 8 characters long.');
       return;
     }
-    setError(null);
+    if (setupPassword !== setupConfirmPassword) {
+      setError('Password and confirmation password do not match.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await apiRequest<any>('/api/auth/setup-admin', {
@@ -224,15 +253,61 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           email: setupEmail.trim(),
           username: setupUsername.trim(),
           password: setupPassword.trim(),
+          confirmPassword: setupConfirmPassword.trim(),
           companyName: setupOrgName.trim() || undefined,
         }),
       });
-      if (res.token) {
-        setStoredSession(res.token, res.user);
-        onLoginSuccess(res.user);
+      if (res && res.recoveryKey) {
+        setSetupSuccessRecoveryKey(res.recoveryKey);
+      } else {
+        setIsFirstRunSetup(false);
+        setInfoMessage('Administrator account created successfully! Please sign in with your credentials to begin.');
       }
     } catch (err: any) {
       setError(err.message || 'Workspace initialization failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExecuteRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setInfoMessage(null);
+
+    if (!recoveryAdminId.trim() || !recoveryKeyInput.trim() || !recoveryNewPassword) {
+      setError('All fields are required.');
+      return;
+    }
+
+    if (recoveryNewPassword.length < 8) {
+      setError('New password must be at least 8 characters in length.');
+      return;
+    }
+
+    if (recoveryNewPassword !== recoveryConfirmPassword) {
+      setError('New password and confirmation do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await apiRequest<any>('/api/auth/admin-recovery', {
+        method: 'POST',
+        body: JSON.stringify({
+          adminIdentifier: recoveryAdminId.trim(),
+          recoveryKey: recoveryKeyInput.trim(),
+          newPassword: recoveryNewPassword.trim(),
+          confirmNewPassword: recoveryConfirmPassword.trim(),
+        }),
+      });
+
+      if (res && res.newRecoveryKey) {
+        setRecoveryRotatedKey(res.newRecoveryKey);
+        setInfoMessage('Administrator password has been reset successfully. A new Emergency Recovery Key has been generated.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Emergency recovery verification failed. Please verify your recovery key.');
     } finally {
       setLoading(false);
     }
@@ -246,7 +321,70 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         ==================================================================== */}
         {isFirstRunSetup && (
           <div>
-            <div className="flex flex-col items-center justify-center pb-5 mb-5 border-b border-[#E5E7EB]">
+            {setupSuccessRecoveryKey ? (
+              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                <div className="text-center pb-4 border-b border-[#E5E7EB]">
+                  <div className="w-12 h-12 rounded-full bg-[#ECFDF5] border border-[#A7F3D0] flex items-center justify-center text-[#059669] mx-auto mb-2.5">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-[17px] font-bold text-[#1F2937]">Administrator Created</h2>
+                  <p className="text-[12px] text-[#6B7280] mt-1 leading-relaxed">
+                    FINORA workspace has been initialized. Please save your Emergency Recovery Key below.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#374151] mb-1.5 uppercase tracking-wider">
+                    Emergency Recovery Key (Single-Use Token)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-[#F3F4F6] border border-[#D1D5DB] rounded-[6px] font-mono font-bold text-[12.5px] text-[#1F2937] tracking-wider select-all">
+                      {setupSuccessRecoveryKey}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(setupSuccessRecoveryKey);
+                        setCopiedRecoveryKey(true);
+                        setTimeout(() => setCopiedRecoveryKey(false), 3000);
+                      }}
+                      className="px-3 py-2 bg-[#FFFFFF] border border-[#D1D5DB] hover:border-[#F47721] hover:text-[#F47721] text-[#374151] rounded-[6px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                    >
+                      {copiedRecoveryKey ? (
+                        <>
+                          <Check className="w-4 h-4 text-[#10B981]" />
+                          <span className="text-[11.5px] text-[#10B981] font-semibold">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          <span className="text-[11.5px]">Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-[8px] text-[11px] text-[#92400E] leading-relaxed">
+                  <strong>Important Security Notice:</strong> Store this Emergency Recovery Key in a secure offline location. If your administrator password or MFA access is ever lost, this cryptographic key is the only authorized method to recover your account.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetupSuccessRecoveryKey(null);
+                    setIsFirstRunSetup(false);
+                    setInfoMessage('Administrator account created successfully! Please sign in with your credentials to begin.');
+                  }}
+                  className="w-full mt-2 py-2.5 px-4 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
+                >
+                  <span>Proceed to Sign In</span>
+                  <ArrowRight className="w-4 h-4 text-[#FFFFFF]" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col items-center justify-center pb-5 mb-5 border-b border-[#E5E7EB]">
               <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[200px]">
                 <img
                   src="/splash_logo.png"
@@ -402,13 +540,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <ArrowRight className="w-4 h-4 text-[#FFFFFF]" />
               </button>
             </form>
+            </>
+            )}
           </div>
         )}
 
         {/* ====================================================================
             GATEWAY 1: NORMAL LOGIN EXPERIENCE (Operator / Viewer Only)
         ==================================================================== */}
-        {!isFirstRunSetup && !isAdminGateway && !forgotMode && (
+        {!isFirstRunSetup && !isAdminGateway && !forgotMode && !recoveryMode && (
           <>
             {/* Top Corporate Branding: Official Animated FINORA Splash Logo */}
             <div className="flex flex-col items-center justify-center pb-5 mb-5 border-b border-[#E5E7EB]">
@@ -507,16 +647,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <label className="block text-[12px] font-medium text-[#6B7280]">
                     Password
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForgotMode(true);
-                      setResetEmail(usernameOrEmail.includes('@') ? usernameOrEmail : '');
-                    }}
-                    className="text-[12px] font-medium text-[#F47721] hover:underline"
-                  >
-                    Forgot password?
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setInfoMessage(null);
+                        setRecoveryMode(true);
+                        setRecoveryAdminId(usernameOrEmail);
+                      }}
+                      className="text-[11.5px] font-medium text-[#6B7280] hover:text-[#F47721] transition-colors cursor-pointer"
+                    >
+                      Emergency Recovery
+                    </button>
+                    <span className="text-[#D1D5DB] text-[11px]">&bull;</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setInfoMessage(null);
+                        setForgotMode(true);
+                        setResetEmail(usernameOrEmail.includes('@') ? usernameOrEmail : '');
+                      }}
+                      className="text-[11.5px] font-medium text-[#F47721] hover:underline cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                 </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#9CA3AF] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -694,6 +851,169 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* ====================================================================
+            GATEWAY 3: ADMINISTRATOR EMERGENCY ACCOUNT RECOVERY
+        ==================================================================== */}
+        {recoveryMode && (
+          <div className="animate-in fade-in zoom-in-95 duration-150">
+            <div className="text-center pb-4 mb-4 border-b border-[#E5E7EB]">
+              <div className="w-10 h-10 rounded-full bg-[#FFF3E8] border border-[#FED7AA] flex items-center justify-center text-[#F47721] mx-auto mb-2">
+                <Key className="w-5 h-5" />
+              </div>
+              <h2 className="text-[17px] font-bold text-[#1F2937]">Emergency Recovery</h2>
+              <p className="text-[12px] text-[#6B7280] mt-0.5">
+                Cryptographic recovery for FINORA Administrator access
+              </p>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 rounded-[8px] bg-[#FEF2F2] border border-[#FECACA] text-[12px] text-[#991B1B]">
+                {error}
+              </div>
+            )}
+
+            {infoMessage && (
+              <div className="mb-4 p-3 rounded-[8px] bg-[#ECFDF5] border border-[#A7F3D0] text-[12px] text-[#065F46]">
+                {infoMessage}
+              </div>
+            )}
+
+            {recoveryRotatedKey ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[11.5px] font-bold text-[#374151] mb-1.5 uppercase tracking-wider">
+                    New Rotated Emergency Recovery Key
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-[#F3F4F6] border border-[#D1D5DB] rounded-[6px] font-mono font-bold text-[12.5px] text-[#1F2937] tracking-wider select-all">
+                      {recoveryRotatedKey}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(recoveryRotatedKey);
+                        setRecoveryCopied(true);
+                        setTimeout(() => setRecoveryCopied(false), 3000);
+                      }}
+                      className="px-3 py-2 bg-[#FFFFFF] border border-[#D1D5DB] hover:border-[#F47721] hover:text-[#F47721] text-[#374151] rounded-[6px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                    >
+                      {recoveryCopied ? (
+                        <>
+                          <Check className="w-4 h-4 text-[#10B981]" />
+                          <span className="text-[11.5px] text-[#10B981] font-semibold">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          <span className="text-[11.5px]">Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-[8px] text-[11px] text-[#92400E] leading-relaxed">
+                  <strong>Important:</strong> Your previous key has been invalidated. Please store this new recovery key in a secure location.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecoveryMode(false);
+                    setRecoveryRotatedKey(null);
+                    setInfoMessage('Administrator password reset successfully. Please sign in with your new password.');
+                  }}
+                  className="w-full py-2.5 px-4 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <span>Return to Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleExecuteRecovery} className="space-y-3.5">
+                <div>
+                  <label className="block text-[12px] font-medium text-[#374151] mb-1">
+                    Administrator Username or Email <span className="text-[#F47721]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={recoveryAdminId}
+                    onChange={(e) => setRecoveryAdminId(e.target.value)}
+                    placeholder="admin or admin@organization.org"
+                    className="w-full px-3 py-2 text-[13px] border border-[#D1D5DB] rounded-[6px] focus:outline-hidden focus:border-[#F47721]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-medium text-[#374151] mb-1">
+                    Emergency Recovery Key <span className="text-[#F47721]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={recoveryKeyInput}
+                    onChange={(e) => setRecoveryKeyInput(e.target.value)}
+                    placeholder="FINORA-REC-XXXX-XXXX-XXXX-XXXX"
+                    className="w-full px-3 py-2 text-[13px] font-mono tracking-wider border border-[#D1D5DB] rounded-[6px] focus:outline-hidden focus:border-[#F47721]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[12px] font-medium text-[#374151] mb-1">
+                      New Password <span className="text-[#F47721]">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={recoveryNewPassword}
+                      onChange={(e) => setRecoveryNewPassword(e.target.value)}
+                      placeholder="Min 8 characters"
+                      className="w-full px-3 py-2 text-[13px] border border-[#D1D5DB] rounded-[6px] focus:outline-hidden focus:border-[#F47721]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-medium text-[#374151] mb-1">
+                      Confirm Password <span className="text-[#F47721]">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={recoveryConfirmPassword}
+                      onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
+                      placeholder="Re-type password"
+                      className="w-full px-3 py-2 text-[13px] border border-[#D1D5DB] rounded-[6px] focus:outline-hidden focus:border-[#F47721]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecoveryMode(false);
+                      setError(null);
+                      setInfoMessage(null);
+                    }}
+                    className="px-4 py-2 border border-[#D1D5DB] rounded-[6px] text-[#374151] hover:bg-[#F3F4F6] text-[12.5px] font-medium cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-2 px-4 rounded-[6px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] font-semibold text-[13px] transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? 'Verifying Key...' : 'Recover & Reset Password'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         )}
 

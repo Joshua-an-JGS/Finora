@@ -35,6 +35,12 @@ public static class DatabaseInitializer
                 ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""UpdateServerUrl"" character varying(300) DEFAULT 'https://github.com/Joshua-an-JGS/Finora';
                 ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""LastUpdateCheckedAtUtc"" timestamp with time zone;
                 ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""LastUpdateInstalledAtUtc"" timestamp with time zone;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""IsInitialized"" boolean DEFAULT false;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""InitializedAtUtc"" timestamp with time zone;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""InitializedByAdminUsername"" character varying(100);
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""CompanySetupCompleted"" boolean DEFAULT false;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""AdminRecoveryKeyHash"" character varying(128);
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""AdminRecoveryKeyGeneratedAtUtc"" timestamp with time zone;
             ");
         }
         else if (db.Database.IsSqlite())
@@ -94,7 +100,22 @@ public static class DatabaseInitializer
             await db.SaveChangesAsync();
         }
 
-        // 4. Seed Default Payslip Templates
+        // 4. Ensure Existing Installations with an Administrator are Marked Initialized
+        var existingAdmins = await userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+        if (existingAdmins.Count > 0)
+        {
+            var company = await db.CompanySettings.FirstOrDefaultAsync();
+            if (company != null && !company.IsInitialized)
+            {
+                company.IsInitialized = true;
+                company.CompanySetupCompleted = true;
+                company.InitializedAtUtc = company.InitializedAtUtc ?? DateTime.UtcNow;
+                company.InitializedByAdminUsername = company.InitializedByAdminUsername ?? existingAdmins[0].UserName;
+                await db.SaveChangesAsync();
+            }
+        }
+
+        // 5. Seed Default Payslip Templates
         if (!await db.PayslipTemplates.AnyAsync())
         {
             var defaultConfig = new PayslipTemplateConfig
@@ -279,7 +300,13 @@ Accounts & Finance Department
                 ("UpdateChannel", "TEXT NOT NULL DEFAULT 'Stable'"),
                 ("UpdateServerUrl", "TEXT NOT NULL DEFAULT 'https://github.com/Joshua-an-JGS/Finora'"),
                 ("LastUpdateCheckedAtUtc", "TEXT NULL"),
-                ("LastUpdateInstalledAtUtc", "TEXT NULL")
+                ("LastUpdateInstalledAtUtc", "TEXT NULL"),
+                ("IsInitialized", "INTEGER NOT NULL DEFAULT 0"),
+                ("InitializedAtUtc", "TEXT NULL"),
+                ("InitializedByAdminUsername", "TEXT NULL"),
+                ("CompanySetupCompleted", "INTEGER NOT NULL DEFAULT 0"),
+                ("AdminRecoveryKeyHash", "TEXT NULL"),
+                ("AdminRecoveryKeyGeneratedAtUtc", "TEXT NULL")
             };
 
             foreach (var (colName, colDef) in companySettingsCols)

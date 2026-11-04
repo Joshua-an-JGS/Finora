@@ -10,6 +10,10 @@ export interface AuthUser {
   isAdminSession?: boolean;
   mfaRequired: boolean;
   mfaConfigured: boolean;
+  companySetupCompleted?: boolean;
+  isActive?: boolean;
+  createdAtUtc?: string;
+  lastLoginAtUtc?: string;
 }
 
 export type UserProfile = AuthUser;

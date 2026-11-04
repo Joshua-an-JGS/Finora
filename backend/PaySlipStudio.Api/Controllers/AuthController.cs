@@ -40,24 +40,30 @@ public class AuthController : ControllerBase
 
     public record LoginRequest(string UsernameOrEmail, string Password, string? MfaCode);
     public record AdminLoginRequest(string AdministratorId, string Password, string? MfaCode);
-    public record FirstTimeSetupRequest(string FullName, string Email, string Username, string Password, string? CompanyName);
+    public record FirstTimeSetupRequest(string FullName, string Email, string Username, string Password, string? ConfirmPassword, string? CompanyName);
+    public record AdminRecoveryRequest(string AdminIdentifier, string RecoveryKey, string NewPassword, string ConfirmNewPassword);
 
     private static readonly ConcurrentDictionary<string, (int Attempts, DateTime LastAttempt)> _adminRateLimit = new();
+    private static readonly ConcurrentDictionary<string, (int Attempts, DateTime LastAttempt)> _recoveryRateLimit = new();
+    private static readonly SemaphoreSlim _setupLock = new(1, 1);
 
     /// <summary>
     /// Checks whether the FINORA installation requires initial Administrator onboarding.
-    /// Returns true if no Administrator accounts exist in the database.
+    /// Returns true if the system has not been marked initialized AND no Administrator accounts exist in the database.
     /// </summary>
     [HttpGet("setup-status")]
     [AllowAnonymous]
     public async Task<IActionResult> GetSetupStatus()
     {
+        var settings = await _db.CompanySettings.FirstOrDefaultAsync();
         var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
-        var isSetupRequired = admins.Count == 0;
+        var isSetupRequired = (settings == null || !settings.IsInitialized) && admins.Count == 0;
 
         return Ok(new
         {
             isSetupRequired,
+            isInitialized = !isSetupRequired,
+            companySetupCompleted = settings?.CompanySetupCompleted ?? false,
             systemVersion = "1.0.0",
             appName = "FINORA"
         });
@@ -71,90 +77,223 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> SetupInitialAdmin([FromBody] FirstTimeSetupRequest req)
     {
-        var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
-        if (admins.Count > 0)
+        await _setupLock.WaitAsync();
+        try
         {
-            return BadRequest(new { message = "FINORA workspace is already initialized. Please sign in." });
+            var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+            var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+            if ((settings != null && settings.IsInitialized) || admins.Count > 0)
+            {
+                return BadRequest(new { message = "FINORA workspace is already initialized. First-time setup can only be executed once." });
+            }
+
+            if (req == null ||
+                string.IsNullOrWhiteSpace(req.FullName) ||
+                string.IsNullOrWhiteSpace(req.Email) ||
+                string.IsNullOrWhiteSpace(req.Username) ||
+                string.IsNullOrWhiteSpace(req.Password))
+            {
+                return BadRequest(new { message = "Full name, work email address, username, and password are required." });
+            }
+
+            var cleanName = req.FullName.Trim();
+            var cleanEmail = req.Email.Trim();
+            var cleanUsername = req.Username.Trim();
+            var password = req.Password.Trim();
+
+            if (cleanName.Length < 2)
+            {
+                return BadRequest(new { message = "Administrator full name must be at least 2 characters in length." });
+            }
+
+            if (!cleanEmail.Contains('@') || !cleanEmail.Contains('.'))
+            {
+                return BadRequest(new { message = "Please enter a valid corporate email address." });
+            }
+
+            if (cleanUsername.Length < 3 || cleanUsername.Contains(' '))
+            {
+                return BadRequest(new { message = "Username must be at least 3 characters and contain no spaces." });
+            }
+
+            if (password.Length < 8)
+            {
+                return BadRequest(new { message = "Administrator password must be at least 8 characters long." });
+            }
+
+            if (!string.IsNullOrWhiteSpace(req.ConfirmPassword) && password != req.ConfirmPassword.Trim())
+            {
+                return BadRequest(new { message = "Password and confirmation password do not match." });
+            }
+
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+
+            var adminUser = new ApplicationUser
+            {
+                UserName = cleanUsername,
+                Email = cleanEmail,
+                EmailConfirmed = true,
+                FullName = cleanName,
+                Department = "Executive Administration & Governance",
+                RoleName = AppRoles.Administrator,
+                IsActive = true,
+                MfaRequired = false,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            var createRes = await _userManager.CreateAsync(adminUser, password);
+            if (!createRes.Succeeded)
+            {
+                var errors = string.Join("; ", createRes.Errors.Select(e => e.Description));
+                return BadRequest(new { message = errors });
+            }
+
+            await _userManager.AddToRoleAsync(adminUser, AppRoles.Administrator);
+
+            // Generate Cryptographic Emergency Administrator Recovery Key
+            var rawRecoveryBytes = RandomNumberGenerator.GetBytes(16);
+            var recoveryHex = Convert.ToHexString(rawRecoveryBytes);
+            var recoveryKey = $"FINORA-REC-{recoveryHex[..4]}-{recoveryHex[4..8]}-{recoveryHex[8..12]}-{recoveryHex[12..16]}";
+            using var sha256 = SHA256.Create();
+            var recoveryKeyHash = Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(recoveryKey)));
+
+            // Update persistent database installation state
+            if (settings == null)
+            {
+                settings = new CompanySettings { Id = 1 };
+                _db.CompanySettings.Add(settings);
+            }
+            settings.IsInitialized = true;
+            settings.InitializedAtUtc = DateTime.UtcNow;
+            settings.InitializedByAdminUsername = adminUser.UserName;
+            settings.CompanySetupCompleted = false;
+            settings.AdminRecoveryKeyHash = recoveryKeyHash;
+            settings.AdminRecoveryKeyGeneratedAtUtc = DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(req.CompanyName))
+            {
+                settings.CompanyName = req.CompanyName.Trim();
+            }
+            settings.UpdatedAtUtc = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            await _audit.RecordAsync(
+                adminUser.Id,
+                adminUser.UserName,
+                AppRoles.Administrator,
+                "System.FirstTimeSetupCompleted",
+                "ApplicationUser",
+                adminUser.Id,
+                $"Initial System Administrator '{adminUser.FullName}' (@{adminUser.UserName}, {adminUser.Email}) registered. FINORA workspace initialized.",
+                ipAddress: ip);
+
+            return Ok(new
+            {
+                success = true,
+                recoveryKey,
+                message = "Administrator account created successfully. FINORA workspace initialized. Please sign in with your new credentials to begin."
+            });
+        }
+        finally
+        {
+            _setupLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Cryptographic emergency recovery for the System Administrator.
+    /// Verifies the SHA-256 hash of the recovery key, resets credentials, rotates key, and invalidates active sessions.
+    /// </summary>
+    [HttpPost("admin-recovery")]
+    [AllowAnonymous]
+    public async Task<IActionResult> AdminRecovery([FromBody] AdminRecoveryRequest req)
+    {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var rateKey = $"rec_{ip}";
+
+        if (_recoveryRateLimit.TryGetValue(rateKey, out var rl) && rl.Attempts >= 3)
+        {
+            if (DateTime.UtcNow - rl.LastAttempt < TimeSpan.FromMinutes(15))
+            {
+                return StatusCode(429, new { message = "Too many recovery attempts from this workstation. Please wait 15 minutes before trying again." });
+            }
+            _recoveryRateLimit.TryRemove(rateKey, out _);
         }
 
         if (req == null ||
-            string.IsNullOrWhiteSpace(req.FullName) ||
-            string.IsNullOrWhiteSpace(req.Email) ||
-            string.IsNullOrWhiteSpace(req.Username) ||
-            string.IsNullOrWhiteSpace(req.Password))
+            string.IsNullOrWhiteSpace(req.AdminIdentifier) ||
+            string.IsNullOrWhiteSpace(req.RecoveryKey) ||
+            string.IsNullOrWhiteSpace(req.NewPassword))
         {
-            return BadRequest(new { message = "Full name, work email address, username, and password are required." });
+            return BadRequest(new { message = "Administrator ID, Emergency Recovery Key, and new password are required." });
         }
 
-        if (req.Password.Trim().Length < 8)
+        if (req.NewPassword != req.ConfirmNewPassword)
         {
-            return BadRequest(new { message = "Administrator password must be at least 8 characters long." });
+            return BadRequest(new { message = "New password and confirmation do not match." });
         }
 
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-
-        var adminUser = new ApplicationUser
+        if (req.NewPassword.Length < 8)
         {
-            UserName = req.Username.Trim(),
-            Email = req.Email.Trim(),
-            EmailConfirmed = true,
-            FullName = req.FullName.Trim(),
-            Department = "Administration & Governance",
-            RoleName = AppRoles.Administrator,
-            IsActive = true,
-            MfaRequired = false,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-
-        var createRes = await _userManager.CreateAsync(adminUser, req.Password.Trim());
-        if (!createRes.Succeeded)
-        {
-            var errors = string.Join("; ", createRes.Errors.Select(e => e.Description));
-            return BadRequest(new { message = errors });
+            return BadRequest(new { message = "New password must be at least 8 characters long." });
         }
 
-        await _userManager.AddToRoleAsync(adminUser, AppRoles.Administrator);
-
-        // Update company name if provided during first-time setup
-        if (!string.IsNullOrWhiteSpace(req.CompanyName))
+        var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+        if (settings == null || string.IsNullOrWhiteSpace(settings.AdminRecoveryKeyHash))
         {
-            var settings = await _db.CompanySettings.FirstOrDefaultAsync();
-            if (settings != null)
-            {
-                settings.CompanyName = req.CompanyName.Trim();
-                settings.UpdatedAtUtc = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
-            }
+            return BadRequest(new { message = "Emergency recovery is not configured on this installation." });
         }
 
-        await _audit.RecordAsync(
-            adminUser.Id,
-            adminUser.UserName,
-            AppRoles.Administrator,
-            "System.FirstTimeSetupCompleted",
-            "ApplicationUser",
-            adminUser.Id,
-            $"Initial System Administrator '{adminUser.FullName}' ({adminUser.Email}) registered and FINORA workspace successfully initialized.",
-            ipAddress: ip);
+        // Verify recovery key hash
+        using var sha256 = SHA256.Create();
+        var cleanKey = req.RecoveryKey.Trim().ToUpperInvariant();
+        var computedHash = Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(cleanKey)));
 
-        var token = GenerateJwtToken(adminUser, AppRoles.Administrator, isAdminGateway: true);
+        if (!string.Equals(settings.AdminRecoveryKeyHash, computedHash, StringComparison.OrdinalIgnoreCase))
+        {
+            _recoveryRateLimit.AddOrUpdate(rateKey, _ => (1, DateTime.UtcNow), (_, old) => (old.Attempts + 1, DateTime.UtcNow));
+            await _audit.RecordAsync("SYSTEM", req.AdminIdentifier, AppRoles.Administrator,
+                "Auth.AdminRecoveryFailed", "CompanySettings", "1",
+                $"Invalid Emergency Recovery Key attempt for Administrator '{req.AdminIdentifier}'.", ipAddress: ip);
+            return BadRequest(new { message = "Invalid Emergency Recovery Key." });
+        }
+
+        var identifier = req.AdminIdentifier.Trim();
+        var user = await _userManager.FindByEmailAsync(identifier) ?? await _userManager.FindByNameAsync(identifier);
+        if (user == null || !await _userManager.IsInRoleAsync(user, AppRoles.Administrator))
+        {
+            return BadRequest(new { message = "Administrator account matching this identifier was not found." });
+        }
+
+        // Reset password
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var resetRes = await _userManager.ResetPasswordAsync(user, resetToken, req.NewPassword.Trim());
+        if (!resetRes.Succeeded)
+        {
+            return BadRequest(new { message = string.Join("; ", resetRes.Errors.Select(e => e.Description)) });
+        }
+
+        // Reset lockout and invalidate active sessions
+        await _userManager.SetLockoutEndDateAsync(user, null);
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        // Rotate recovery key
+        var newRecoveryBytes = RandomNumberGenerator.GetBytes(16);
+        var newRecoveryHex = Convert.ToHexString(newRecoveryBytes);
+        var rotatedKey = $"FINORA-REC-{newRecoveryHex[..4]}-{newRecoveryHex[4..8]}-{newRecoveryHex[8..12]}-{newRecoveryHex[12..16]}";
+        settings.AdminRecoveryKeyHash = Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(rotatedKey)));
+        settings.AdminRecoveryKeyGeneratedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        await _audit.RecordAsync(user.Id, user.UserName ?? user.Email!, AppRoles.Administrator,
+            "Auth.AdminRecoverySuccess", "ApplicationUser", user.Id,
+            $"Administrator account '{user.UserName}' successfully recovered and password updated. Recovery key rotated.", ipAddress: ip);
 
         return Ok(new
         {
-            token,
-            message = "FINORA workspace initialized successfully. Welcome!",
-            user = new
-            {
-                id = adminUser.Id,
-                userName = adminUser.UserName,
-                email = adminUser.Email,
-                fullName = adminUser.FullName,
-                department = adminUser.Department,
-                role = AppRoles.Administrator,
-                isAdminSession = true,
-                mfaRequired = adminUser.MfaRequired,
-                mfaConfigured = adminUser.MfaConfigured
-            }
+            success = true,
+            newRecoveryKey = rotatedKey,
+            message = "Administrator password reset successfully. A new Emergency Recovery Key has been generated. Please store it safely."
         });
     }
 
@@ -269,6 +408,8 @@ public class AuthController : ControllerBase
         await _userManager.UpdateAsync(user);
 
         var token = GenerateJwtToken(user, AppRoles.Administrator, isAdminGateway: true);
+        var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+        bool companySetupCompleted = settings?.CompanySetupCompleted ?? true;
 
         await _audit.RecordAsync(
             user.Id,
@@ -284,6 +425,7 @@ public class AuthController : ControllerBase
         {
             token,
             isAdminSession = true,
+            companySetupCompleted,
             user = new
             {
                 id = user.Id,
@@ -294,7 +436,8 @@ public class AuthController : ControllerBase
                 role = AppRoles.Administrator,
                 isAdminSession = true,
                 mfaRequired = user.MfaRequired,
-                mfaConfigured = user.MfaConfigured
+                mfaConfigured = user.MfaConfigured,
+                companySetupCompleted
             }
         });
     }
@@ -364,7 +507,10 @@ public class AuthController : ControllerBase
         user.LastLoginAtUtc = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
 
-        var token = GenerateJwtToken(user, primaryRole);
+        var isAdmin = primaryRole == AppRoles.Administrator;
+        var token = GenerateJwtToken(user, primaryRole, isAdminGateway: isAdmin);
+        var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+        bool companySetupCompleted = settings?.CompanySetupCompleted ?? true;
 
         await _audit.RecordAsync(
             user.Id,
@@ -379,6 +525,8 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             token,
+            isAdminSession = isAdmin,
+            companySetupCompleted,
             user = new
             {
                 id = user.Id,
@@ -387,8 +535,10 @@ public class AuthController : ControllerBase
                 fullName = user.FullName,
                 department = user.Department,
                 role = primaryRole,
+                isAdminSession = isAdmin,
                 mfaRequired = user.MfaRequired,
-                mfaConfigured = user.MfaConfigured
+                mfaConfigured = user.MfaConfigured,
+                companySetupCompleted
             }
         });
     }
@@ -408,6 +558,8 @@ public class AuthController : ControllerBase
         var roles = await _userManager.GetRolesAsync(user);
         var primaryRole = roles.FirstOrDefault() ?? user.RoleName ?? AppRoles.Viewer;
         var isAdminSession = User.HasClaim(c => c.Type == "PrivilegedAdminSession" && c.Value == "true");
+        var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+        bool companySetupCompleted = settings?.CompanySetupCompleted ?? true;
 
         return Ok(new
         {
@@ -419,7 +571,8 @@ public class AuthController : ControllerBase
             role = primaryRole,
             isAdminSession = isAdminSession,
             mfaRequired = user.MfaRequired,
-            mfaConfigured = user.MfaConfigured
+            mfaConfigured = user.MfaConfigured,
+            companySetupCompleted
         });
     }
 

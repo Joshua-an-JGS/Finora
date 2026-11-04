@@ -50,6 +50,7 @@ import {
   UserManagementView,
 } from './components/ModuleViews';
 import { MyProfileView } from './components/MyProfileView';
+import { CompanySetupWizard } from './components/CompanySetupWizard';
 
 type NavKey =
   | 'dashboard'
@@ -92,6 +93,7 @@ export const App: React.FC = () => {
   const [activeMonth, setActiveMonth] = useState<number>(10);
   const [activeYear, setActiveYear] = useState<number>(2026);
   const [selectedEditorRecordId, setSelectedEditorRecordId] = useState<string | null>(null);
+  const [showCompanyWizard, setShowCompanyWizard] = useState(false);
 
   // Top Header Global Employee Search
   const [globalSearch, setGlobalSearch] = useState('');
@@ -202,8 +204,15 @@ export const App: React.FC = () => {
     apiRequest<UserProfile>('/api/auth/me')
       .then((profile) => {
         setUser(profile);
-        if (profile.role === 'Administrator' && profile.isAdminSession) {
-          setViewMode('admin-console');
+        if (profile.role === 'Administrator') {
+          if (profile.companySetupCompleted === false) {
+            setShowCompanyWizard(true);
+          }
+          if (profile.isAdminSession) {
+            setViewMode('admin-console');
+          } else {
+            setViewMode('workspace');
+          }
         } else {
           setViewMode('workspace');
         }
@@ -255,8 +264,15 @@ export const App: React.FC = () => {
       <LoginView
         onLoginSuccess={(u) => {
           setUser(u);
-          if (u.role === 'Administrator' && u.isAdminSession) {
-            setViewMode('admin-console');
+          if (u.role === 'Administrator') {
+            if (u.companySetupCompleted === false) {
+              setShowCompanyWizard(true);
+            }
+            if (u.isAdminSession) {
+              setViewMode('admin-console');
+            } else {
+              setViewMode('workspace');
+            }
           } else {
             setViewMode('workspace');
           }
@@ -300,7 +316,21 @@ export const App: React.FC = () => {
 
   if (viewMode === 'admin-console' && isAdmin) {
     return (
-      <AdminConsoleView
+      <>
+        {showCompanyWizard && user && user.role === 'Administrator' && (
+          <CompanySetupWizard
+            currentUser={user}
+            onFinish={() => {
+              setShowCompanyWizard(false);
+              setUser((prev) => (prev ? { ...prev, companySetupCompleted: true } : null));
+            }}
+            onSkip={() => {
+              setShowCompanyWizard(false);
+              setUser((prev) => (prev ? { ...prev, companySetupCompleted: true } : null));
+            }}
+          />
+        )}
+        <AdminConsoleView
         currentUser={user}
         onReturnToFinora={() => setViewMode('workspace')}
         onLogout={handleLogout}
@@ -313,6 +343,7 @@ export const App: React.FC = () => {
           setActiveYear(y);
         }}
       />
+      </>
     );
   }
 

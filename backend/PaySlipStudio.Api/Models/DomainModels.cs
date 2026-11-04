@@ -119,6 +119,18 @@ public class CompanySettings
 
     public DateTime? LastUpdateCheckedAtUtc { get; set; }
     public DateTime? LastUpdateInstalledAtUtc { get; set; }
+
+    // Persistent Installation & First-Time Setup State
+    public bool IsInitialized { get; set; } = false;
+    public DateTime? InitializedAtUtc { get; set; }
+    [MaxLength(100)]
+    public string? InitializedByAdminUsername { get; set; }
+    public bool CompanySetupCompleted { get; set; } = false;
+
+    // Cryptographic Administrator Emergency Recovery
+    [MaxLength(128)]
+    public string? AdminRecoveryKeyHash { get; set; }
+    public DateTime? AdminRecoveryKeyGeneratedAtUtc { get; set; }
 }
 
 public class PayrollPeriod

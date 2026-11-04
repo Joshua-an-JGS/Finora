@@ -152,6 +152,8 @@ public class AdminAndSettingsController : ControllerBase
             s.SmtpFromEmail,
             s.SmtpFromName,
             s.DocumentRetentionDays,
+            s.IsInitialized,
+            s.CompanySetupCompleted,
             s.UpdatedAtUtc
         });
     }
@@ -239,6 +241,23 @@ public class AdminAndSettingsController : ControllerBase
             $"Updated organization & email delivery configuration (Company='{s.CompanyName}', EmailMode='{s.EmailProviderMode}', SmtpHost='{s.SmtpHost}', ShowZeroByDefault={s.ShowZeroValueComponentsByDefault}).");
 
         return await GetCompanySettings();
+    }
+
+    [HttpPost("settings/company/complete-setup")]
+    [Authorize(Roles = AppRoles.Administrator)]
+    public async Task<IActionResult> MarkCompanySetupComplete()
+    {
+        var s = await _db.CompanySettings.FirstOrDefaultAsync();
+        if (s != null)
+        {
+            s.CompanySetupCompleted = true;
+            s.UpdatedAtUtc = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            await _audit.RecordAsync(CurrentUserId, CurrentUserName, CurrentUserRole,
+                "Company.SetupCompleted", "CompanySettings", s.Id.ToString(),
+                $"Initial company profile configuration marked complete by Administrator '{CurrentUserName}'.");
+        }
+        return Ok(new { success = true, message = "Company setup marked as completed." });
     }
 
     public class SmtpTestRequest
