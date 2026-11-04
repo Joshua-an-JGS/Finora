@@ -197,19 +197,30 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         ==================================================================== */}
         {!isAdminGateway && !forgotMode && (
           <>
-            {/* Top Corporate Branding */}
-            <div className="flex items-center gap-3 pb-5 mb-5 border-b border-[#E5E7EB]">
-              <img
-                src="/finora_logo.png"
-                alt="FINORA Logo"
-                className="w-[52px] h-[52px] object-contain rounded-[9px] shrink-0"
-              />
-              <div className="leading-tight">
-                <h1 className="text-[23px] font-bold text-[#1F2937] tracking-tight">
-                  FINORA
-                </h1>
-                <div className="text-[10px] sm:text-[10.5px] font-semibold uppercase tracking-wider text-[#F47721] mt-0.5">
-                  Finance &amp; Payroll Management System
+            {/* Top Corporate Branding: Official Animated FINORA Splash Logo */}
+            <div className="flex flex-col items-center justify-center pb-5 mb-5 border-b border-[#E5E7EB]">
+              <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[270px]">
+                <img
+                  src="/splash_logo.png"
+                  alt="FINORA — Finance &amp; Payroll Management System"
+                  className="w-full max-w-[270px] h-auto object-contain block relative z-[1]"
+                />
+                {/* Continuous Orange Light Sweep Overlay (1s sweep, 1s pause) */}
+                <div
+                  className="absolute inset-0 pointer-events-none z-[2] overflow-hidden"
+                  style={{
+                    WebkitMaskImage: 'url(/splash_logo.png)',
+                    WebkitMaskSize: 'contain',
+                    WebkitMaskRepeat: 'no-repeat',
+                    WebkitMaskPosition: 'center',
+                    maskImage: 'url(/splash_logo.png)',
+                    maskSize: 'contain',
+                    maskRepeat: 'no-repeat',
+                    maskPosition: 'center',
+                  }}
+                  aria-hidden="true"
+                >
+                  <div className="logo-sweep-beam-login" />
                 </div>
               </div>
             </div>
@@ -331,20 +342,38 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         ==================================================================== */}
         {isAdminGateway && !forgotMode && (
           <div className="space-y-5">
-            {/* Admin Header with Shield & Corporate Logo */}
+            {/* Admin Header with Animated Logo & Administrator Badge */}
             <div className="text-center pb-4 border-b border-[#E5E7EB]">
-              <div className="flex justify-center mb-2.5">
-                <div className="w-14 h-14 rounded-[12px] bg-[#1F2937] border-2 border-[#F47721] flex items-center justify-center text-[#FFFFFF] shadow-md">
-                  <ShieldAlert className="w-7 h-7 text-[#F47721]" />
+              <div className="flex justify-center mb-3">
+                <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[240px]">
+                  <img
+                    src="/splash_logo.png"
+                    alt="FINORA — Finance &amp; Payroll Management System"
+                    className="w-full max-w-[240px] h-auto object-contain block relative z-[1]"
+                  />
+                  <div
+                    className="absolute inset-0 pointer-events-none z-[2] overflow-hidden"
+                    style={{
+                      WebkitMaskImage: 'url(/splash_logo.png)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskImage: 'url(/splash_logo.png)',
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                    }}
+                    aria-hidden="true"
+                  >
+                    <div className="logo-sweep-beam-login" />
+                  </div>
                 </div>
               </div>
-              <h1 className="text-[22px] font-bold text-[#1F2937] tracking-tight">
-                FINORA
-              </h1>
-              <h2 className="text-[16px] font-bold text-[#F47721] mt-0.5">
-                Administrator Access
-              </h2>
-              <p className="text-[12px] text-[#6B7280] mt-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3E8] border border-[#F47721]/30 text-[11px] font-bold text-[#F47721] tracking-wide uppercase">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>Administrator Access</span>
+              </div>
+              <p className="text-[12px] text-[#6B7280] mt-1.5">
                 Restricted system administration area
               </p>
             </div>

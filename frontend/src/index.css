@@ -115,3 +115,54 @@ input[type="radio"] {
     display: table-header-group;
   }
 }
+
+/* ============================================================================
+   Animated Official FINORA Splash Logo (Login Screen & Brand Cards)
+   Periodic Orange Light Sweep every 1 second (2s cycle: 1s sweep, 1s pause)
+   ============================================================================ */
+.logo-sweep-beam-login {
+  position: absolute;
+  top: -20%;
+  left: -100%;
+  width: 70%;
+  height: 140%;
+  background: linear-gradient(
+    105deg,
+    rgba(244, 119, 33, 0) 0%,
+    rgba(244, 119, 33, 0.2) 25%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(244, 119, 33, 0.28) 65%,
+    rgba(244, 119, 33, 0) 100%
+  );
+  transform: skewX(-22deg) translateZ(0);
+  will-change: transform, opacity;
+  animation: loginSweepLoop 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes loginSweepLoop {
+  0% {
+    transform: translateX(0%) skewX(-22deg);
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(380%) skewX(-22deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(380%) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-sweep-beam-login {
+    animation: none !important;
+    display: none !important;
+  }
+}
