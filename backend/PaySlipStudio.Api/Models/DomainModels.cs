@@ -41,22 +41,22 @@ public class CompanySettings
     public int Id { get; set; } = 1;
 
     [MaxLength(200)]
-    public string CompanyName { get; set; } = "Advanced Manufacturing Technology Development Centre (AMTDC)";
+    public string CompanyName { get; set; } = "FINORA Enterprise";
 
     [MaxLength(250)]
-    public string Subtitle { get; set; } = "Centre of Excellence in Advanced Manufacturing Technology";
+    public string Subtitle { get; set; } = "Finance & Payroll Management";
 
     [MaxLength(500)]
-    public string RegisteredAddress { get; set; } = "Research Park / Engineering Campus (Configure Official Address in Settings)";
+    public string RegisteredAddress { get; set; } = "Institutional Campus / Registered Office Address";
 
     [MaxLength(150)]
-    public string ContactEmail { get; set; } = "accounts@amtdc.org";
+    public string ContactEmail { get; set; } = "payroll@organization.org";
 
     [MaxLength(100)]
-    public string ContactPhone { get; set; } = "+91 (044) 0000-0000";
+    public string ContactPhone { get; set; } = "+91 0000 000000";
 
     [MaxLength(200)]
-    public string WebsiteUrl { get; set; } = "https://amtdc.org/";
+    public string WebsiteUrl { get; set; } = "";
 
     [MaxLength(200)]
     public string AuthorizedIdentifiers { get; set; } = "";
@@ -98,10 +98,10 @@ public class CompanySettings
     public string? SmtpPasswordEncrypted { get; set; }
 
     [MaxLength(200)]
-    public string SmtpFromEmail { get; set; } = "accounts@amtdc.org";
+    public string SmtpFromEmail { get; set; } = "payroll@organization.org";
 
     [MaxLength(200)]
-    public string SmtpFromName { get; set; } = "AMTDC Accounts Department";
+    public string SmtpFromName { get; set; } = "FINORA Payroll Administration";
 
     public int DocumentRetentionDays { get; set; } = 1095;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;

@@ -27,7 +27,7 @@ public class PayslipDocumentResolver
             EmployeeId = record.EmployeeId,
             PayrollPeriodId = record.PayrollPeriodId,
             TemplateId = record.SelectedTemplateId ?? template?.Id,
-            TemplateName = template?.Name ?? "AMTDC Institutional Default",
+            TemplateName = template?.Name ?? "FINORA Institutional Standard",
             RecordStatus = record.Status,
 
             CompanyName = styleConfig.OverrideCompanyName != null

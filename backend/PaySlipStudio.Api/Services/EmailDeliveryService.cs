@@ -190,7 +190,7 @@ public class EmailDeliveryService
             ? companySettings.SmtpFromEmail.Trim()
             : (!string.IsNullOrWhiteSpace(companySettings.SmtpUsername) && companySettings.SmtpUsername.Contains('@')
                 ? companySettings.SmtpUsername.Trim()
-                : "accounts@amtdc.org");
+                : "payroll@organization.org");
 
         // Build MIME message with single employee PDF attachment
         var message = new MimeMessage();
@@ -229,7 +229,7 @@ public class EmailDeliveryService
                 {
                     await SaveToSandboxOutboxAsync(message, attempt);
                     attempt.Status = EmailDeliveryStatuses.Accepted;
-                    attempt.ProviderMessageId = $"<sandbox-{attempt.Id:N}@payslip-studio.local>";
+                    attempt.ProviderMessageId = $"<sandbox-{attempt.Id:N}@finora.local>";
                     attempt.CompletedAtUtc = DateTime.UtcNow;
                 }
             }
@@ -240,9 +240,8 @@ public class EmailDeliveryService
                     ? companySettings.SmtpUsername.Trim()
                     : effectiveFromEmail;
 
-                // Auto-correct smtp.office365.com to smtp.gmail.com for @amtdc.org (Google Workspace) or @gmail.com
-                if ((smtpUser.EndsWith("@amtdc.org", StringComparison.OrdinalIgnoreCase) ||
-                     smtpUser.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase)) &&
+                // Auto-correct smtp.office365.com to smtp.gmail.com for @gmail.com
+                if (smtpUser.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) &&
                     smtpHost.Equals("smtp.office365.com", StringComparison.OrdinalIgnoreCase))
                 {
                     smtpHost = "smtp.gmail.com";
@@ -286,7 +285,7 @@ public class EmailDeliveryService
         catch (MailKit.Security.AuthenticationException authEx)
         {
             attempt.Status = EmailDeliveryStatuses.Failed;
-            attempt.ErrorDetails = $"SMTP Authentication failed for '{companySettings.SmtpUsername}': {authEx.Message}. For Google Workspace (@amtdc.org) or Gmail, please use a 16-character Google App Password (myaccount.google.com/apppasswords).";
+            attempt.ErrorDetails = $"SMTP Authentication failed for '{companySettings.SmtpUsername}': {authEx.Message}. For Google Workspace or Gmail, please use a 16-character Google App Password (myaccount.google.com/apppasswords).";
             attempt.CompletedAtUtc = DateTime.UtcNow;
         }
         catch (SmtpProtocolException protoEx) when (sendStarted)

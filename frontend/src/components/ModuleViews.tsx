@@ -922,7 +922,7 @@ export const PayslipTemplatesView: React.FC<{ canEdit: boolean }> = ({ canEdit }
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. accounts@amtdc.org · +91 (044) 2257-0000"
+                  placeholder="e.g. accounts@organization.org · +91 0000 000000"
                   value={editingTpl.config.overrideCompanyContact || ''}
                   onChange={(e) =>
                     setEditingTpl({
@@ -939,7 +939,7 @@ export const PayslipTemplatesView: React.FC<{ canEdit: boolean }> = ({ canEdit }
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. https://amtdc.org/"
+                  placeholder="e.g. https://organization.org/"
                   value={editingTpl.config.overrideCompanyWebsite || ''}
                   onChange={(e) =>
                     setEditingTpl({
@@ -2248,7 +2248,7 @@ export const UserManagementView: React.FC<{
                       required
                       value={addForm.email}
                       onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                      placeholder="e.g. jsmith@amtdc.org"
+                      placeholder="e.g. jsmith@organization.org"
                       className="w-full px-3 py-2 border border-[#E5E7EB] rounded-[7px] text-[#1F2937] focus:outline-none focus:border-[#F47721]"
                     />
                   </div>
@@ -2865,9 +2865,8 @@ export const SettingsView: React.FC<{
   useEffect(() => {
     apiRequest<any>('/api/settings/company')
       .then((s) => {
-        const fromAddr = s.smtpFromEmail || 'research17@amtdc.org';
+        const fromAddr = s.smtpFromEmail || 'payroll@organization.org';
         const isGoogle =
-          fromAddr.toLowerCase().endsWith('@amtdc.org') ||
           fromAddr.toLowerCase().endsWith('@gmail.com');
         setForm({
           ...s,
@@ -3129,7 +3128,7 @@ export const SettingsView: React.FC<{
                     : 'bg-[#FFFFFF] border-[#E5E7EB] text-[#6B7280]'
                 }`}
               >
-                Google Workspace / Gmail (amtdc.org)
+                Google Workspace / Gmail
               </button>
               <button
                 type="button"
@@ -3199,7 +3198,6 @@ export const SettingsView: React.FC<{
               onChange={(e) => {
                 const email = e.target.value;
                 const isGoogle =
-                  email.toLowerCase().endsWith('@amtdc.org') ||
                   email.toLowerCase().endsWith('@gmail.com');
                 setForm({
                   ...form,

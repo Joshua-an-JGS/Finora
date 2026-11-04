@@ -6,7 +6,9 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using PaySlipStudio.Api.Data;
 using PaySlipStudio.Api.Models;
 using PaySlipStudio.Api.Services;
 
@@ -20,23 +22,141 @@ public class AuthController : ControllerBase
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly AuditService _audit;
     private readonly IConfiguration _config;
+    private readonly ApplicationDbContext _db;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         AuditService audit,
-        IConfiguration config)
+        IConfiguration config,
+        ApplicationDbContext db)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _audit = audit;
         _config = config;
+        _db = db;
     }
 
     public record LoginRequest(string UsernameOrEmail, string Password, string? MfaCode);
     public record AdminLoginRequest(string AdministratorId, string Password, string? MfaCode);
+    public record FirstTimeSetupRequest(string FullName, string Email, string Username, string Password, string? CompanyName);
 
     private static readonly ConcurrentDictionary<string, (int Attempts, DateTime LastAttempt)> _adminRateLimit = new();
+
+    /// <summary>
+    /// Checks whether the FINORA installation requires initial Administrator onboarding.
+    /// Returns true if no Administrator accounts exist in the database.
+    /// </summary>
+    [HttpGet("setup-status")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetSetupStatus()
+    {
+        var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+        var isSetupRequired = admins.Count == 0;
+
+        return Ok(new
+        {
+            isSetupRequired,
+            systemVersion = "1.0.0",
+            appName = "FINORA"
+        });
+    }
+
+    /// <summary>
+    /// First-time initial setup to register the primary System Administrator and initialize the customer workspace.
+    /// Can only be executed once when no Administrator exists.
+    /// </summary>
+    [HttpPost("setup-admin")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SetupInitialAdmin([FromBody] FirstTimeSetupRequest req)
+    {
+        var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+        if (admins.Count > 0)
+        {
+            return BadRequest(new { message = "FINORA workspace is already initialized. Please sign in." });
+        }
+
+        if (req == null ||
+            string.IsNullOrWhiteSpace(req.FullName) ||
+            string.IsNullOrWhiteSpace(req.Email) ||
+            string.IsNullOrWhiteSpace(req.Username) ||
+            string.IsNullOrWhiteSpace(req.Password))
+        {
+            return BadRequest(new { message = "Full name, work email address, username, and password are required." });
+        }
+
+        if (req.Password.Trim().Length < 8)
+        {
+            return BadRequest(new { message = "Administrator password must be at least 8 characters long." });
+        }
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+
+        var adminUser = new ApplicationUser
+        {
+            UserName = req.Username.Trim(),
+            Email = req.Email.Trim(),
+            EmailConfirmed = true,
+            FullName = req.FullName.Trim(),
+            Department = "Administration & Governance",
+            RoleName = AppRoles.Administrator,
+            IsActive = true,
+            MfaRequired = false,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        var createRes = await _userManager.CreateAsync(adminUser, req.Password.Trim());
+        if (!createRes.Succeeded)
+        {
+            var errors = string.Join("; ", createRes.Errors.Select(e => e.Description));
+            return BadRequest(new { message = errors });
+        }
+
+        await _userManager.AddToRoleAsync(adminUser, AppRoles.Administrator);
+
+        // Update company name if provided during first-time setup
+        if (!string.IsNullOrWhiteSpace(req.CompanyName))
+        {
+            var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+            if (settings != null)
+            {
+                settings.CompanyName = req.CompanyName.Trim();
+                settings.UpdatedAtUtc = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        await _audit.RecordAsync(
+            adminUser.Id,
+            adminUser.UserName,
+            AppRoles.Administrator,
+            "System.FirstTimeSetupCompleted",
+            "ApplicationUser",
+            adminUser.Id,
+            $"Initial System Administrator '{adminUser.FullName}' ({adminUser.Email}) registered and FINORA workspace successfully initialized.",
+            ipAddress: ip);
+
+        var token = GenerateJwtToken(adminUser, AppRoles.Administrator, isAdminGateway: true);
+
+        return Ok(new
+        {
+            token,
+            message = "FINORA workspace initialized successfully. Welcome!",
+            user = new
+            {
+                id = adminUser.Id,
+                userName = adminUser.UserName,
+                email = adminUser.Email,
+                fullName = adminUser.FullName,
+                department = adminUser.Department,
+                role = AppRoles.Administrator,
+                isAdminSession = true,
+                mfaRequired = adminUser.MfaRequired,
+                mfaConfigured = adminUser.MfaConfigured
+            }
+        });
+    }
 
     [HttpPost("admin-login")]
     [AllowAnonymous]

@@ -155,7 +155,7 @@ public class PayslipDocumentModel
     public Guid EmployeeId { get; set; }
     public Guid PayrollPeriodId { get; set; }
     public Guid? TemplateId { get; set; }
-    public string TemplateName { get; set; } = "AMTDC Institutional Default";
+    public string TemplateName { get; set; } = "FINORA Institutional Standard";
     public string RecordStatus { get; set; } = "Imported";
     // Organization Identity
     public string CompanyName { get; set; } = string.Empty;

@@ -217,8 +217,7 @@ public class AdminAndSettingsController : ControllerBase
             ? req.SmtpUsername.Trim()
             : s.SmtpFromEmail;
 
-        if ((s.SmtpFromEmail.EndsWith("@amtdc.org", StringComparison.OrdinalIgnoreCase) ||
-             s.SmtpFromEmail.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase)) &&
+        if (s.SmtpFromEmail.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) &&
             (string.IsNullOrWhiteSpace(s.SmtpHost) || s.SmtpHost.Equals("smtp.office365.com", StringComparison.OrdinalIgnoreCase)))
         {
             s.SmtpHost = "smtp.gmail.com";
@@ -263,8 +262,7 @@ public class AdminAndSettingsController : ControllerBase
         string user = !string.IsNullOrWhiteSpace(req.SmtpUsername) ? req.SmtpUsername.Trim() : (!string.IsNullOrWhiteSpace(s.SmtpUsername) ? s.SmtpUsername : fromEmail);
         string pass = !string.IsNullOrWhiteSpace(req.SmtpPassword) ? req.SmtpPassword.Trim() : (s.SmtpPasswordEncrypted ?? string.Empty);
 
-        if ((user.EndsWith("@amtdc.org", StringComparison.OrdinalIgnoreCase) ||
-             user.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase)) &&
+        if (user.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) &&
             (string.IsNullOrWhiteSpace(host) || host.Equals("smtp.office365.com", StringComparison.OrdinalIgnoreCase)))
         {
             host = "smtp.gmail.com";
@@ -331,7 +329,7 @@ public class AdminAndSettingsController : ControllerBase
         {
             return BadRequest(new
             {
-                message = $"SMTP login rejected by {host}:{port} for '{user}' ({authEx.Message}). If using Google Workspace (@amtdc.org) or Gmail (@gmail.com), please generate a 16-character Google App Password at https://myaccount.google.com/apppasswords and paste it as the SMTP Password."
+                message = $"SMTP login rejected by {host}:{port} for '{user}' ({authEx.Message}). If using Google Workspace or Gmail (@gmail.com), please generate a 16-character Google App Password at https://myaccount.google.com/apppasswords and paste it as the SMTP Password."
             });
         }
         catch (Exception ex)

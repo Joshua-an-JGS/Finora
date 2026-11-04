@@ -51,36 +51,19 @@ public static class DatabaseInitializer
             }
         }
 
-        // 2. Seed Users (Administrator, AccountsOperator, Viewer)
-        await EnsureUserAsync(
-            userManager,
-            email: config["BootstrapAdmin:Email"] ?? "admin@amtdc.org",
-            userName: config["BootstrapAdmin:Username"] ?? "admin",
-            password: config["BootstrapAdmin:InitialPassword"] ?? "Admin@12345!",
-            fullName: "System Administrator",
-            department: "IT & Governance",
-            role: AppRoles.Administrator,
-            mfaRequired: false);
-
-        await EnsureUserAsync(
-            userManager,
-            email: "operator@amtdc.org",
-            userName: "operator",
-            password: "Operator@12345!",
-            fullName: "Priya Nair (Accounts Operator)",
-            department: "Accounts & Finance",
-            role: AppRoles.AccountsOperator,
-            mfaRequired: false);
-
-        await EnsureUserAsync(
-            userManager,
-            email: "viewer@amtdc.org",
-            userName: "viewer",
-            password: "Viewer@12345!",
-            fullName: "Rajesh Verma (Audit Viewer)",
-            department: "Internal Audit",
-            role: AppRoles.Viewer,
-            mfaRequired: false);
+        // 2. Seed Initial Users Only if Explicitly Requested via Config (Fresh Production Installs Use First-Time Setup Wizard)
+        if (string.Equals(config["BootstrapAdmin:ForceSeed"], "true", StringComparison.OrdinalIgnoreCase))
+        {
+            await EnsureUserAsync(
+                userManager,
+                email: config["BootstrapAdmin:Email"] ?? "admin@organization.org",
+                userName: config["BootstrapAdmin:Username"] ?? "admin",
+                password: config["BootstrapAdmin:InitialPassword"] ?? "Admin@12345!",
+                fullName: "System Administrator",
+                department: "IT & Governance",
+                role: AppRoles.Administrator,
+                mfaRequired: false);
+        }
 
         // 3. Seed CompanySettings
         if (!await db.CompanySettings.AnyAsync())
@@ -88,24 +71,24 @@ public static class DatabaseInitializer
             db.CompanySettings.Add(new CompanySettings
             {
                 Id = 1,
-                CompanyName = "Advanced Manufacturing Technology Development Centre (AMTDC)",
-                Subtitle = "Centre of Excellence in Advanced Manufacturing Technology",
-                RegisteredAddress = "IIT Madras Research Park, Kanagam Road, Taramani, Chennai — 600113",
-                ContactEmail = "accounts@amtdc.org",
-                ContactPhone = "+91 (044) 2257-0000",
-                WebsiteUrl = "https://amtdc.org/",
+                CompanyName = "FINORA Enterprise",
+                Subtitle = "Finance & Payroll Management Division",
+                RegisteredAddress = "Institutional Campus / Registered Office Address",
+                ContactEmail = "payroll@organization.org",
+                ContactPhone = "+91 0000 000000",
+                WebsiteUrl = "",
                 AuthorizedIdentifiers = "Institutional Payroll Division",
                 SignatoryName = "Authorized Signatory",
-                SignatoryDesignation = "Head — Accounts & Finance",
+                SignatoryDesignation = "Head of Finance & Accounts",
                 CurrencySymbol = "₹",
                 CurrencyCode = "INR",
                 ShowZeroValueComponentsByDefault = false,
                 ShowAmountInWordsByDefault = true,
-                ActivePayrollMonth = 10,
-                ActivePayrollYear = 2026,
+                ActivePayrollMonth = DateTime.UtcNow.Month,
+                ActivePayrollYear = DateTime.UtcNow.Year,
                 EmailProviderMode = "Sandbox",
-                SmtpFromEmail = "accounts@amtdc.org",
-                SmtpFromName = "AMTDC Accounts Department",
+                SmtpFromEmail = "payroll@organization.org",
+                SmtpFromName = "FINORA Payroll Administration",
                 UpdatedAtUtc = DateTime.UtcNow
             });
             await db.SaveChangesAsync();
@@ -173,8 +156,8 @@ public static class DatabaseInitializer
             db.PayslipTemplates.AddRange(
                 new PayslipTemplate
                 {
-                    Name = "AMTDC Institutional Standard",
-                    Description = "Official institutional two-column A4 payslip with AMTDC orange (#F47721) accents, deep navy (#071747) typography, and dynamic zero-row suppression.",
+                    Name = "FINORA Institutional Standard",
+                    Description = "Official institutional two-column A4 payslip with FINORA orange (#F47721) accents, deep navy (#071747) typography, and dynamic zero-row suppression.",
                     IsDefault = true,
                     IsSystemBuiltin = true,
                     Version = 1,
@@ -243,62 +226,6 @@ Accounts & Finance Department
                 }
             );
             await db.SaveChangesAsync();
-        }
-
-        // 6. Auto-Import Mock Excel File on First Boot if Database Has No Payroll Records
-        if (!await db.PayrollRecords.AnyAsync())
-        {
-            var baseDataDir = config["FINORA_BASE_DATA_DIR"]
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FINORA");
-
-            var candidatePaths = new[]
-            {
-                Path.Combine(AppContext.BaseDirectory, "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
-                Path.Combine(AppContext.BaseDirectory, "Resources", "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
-                Path.Combine(baseDataDir, "Imports", "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
-                Path.Combine(env.ContentRootPath, "..", "..", "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
-                Path.Combine(env.ContentRootPath, "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
-                @"G:\UAV\PAY SLIP\PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"
-            };
-
-            var mockFilePath = candidatePaths.FirstOrDefault(File.Exists);
-            if (mockFilePath != null)
-            {
-                var adminUser = await userManager.FindByNameAsync("admin");
-                string uid = adminUser?.Id ?? "system";
-                string uname = adminUser?.UserName ?? "admin";
-
-                var sheetsToSeed = new (string SheetName, int Month, int Year)[]
-                {
-                    ("September 2026", 9, 2026),
-                    ("October 2026", 10, 2026),
-                    ("November 2026", 11, 2026)
-                };
-
-                foreach (var (sheetName, month, year) in sheetsToSeed)
-                {
-                    await using var fs = new FileStream(mockFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    var stage = await excelService.StageUploadAsync(
-                        fs,
-                        "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx",
-                        month,
-                        year,
-                        uid,
-                        uname);
-
-                    await excelService.AnalyzeAndPreviewAsync(stage.ImportBatchId, sheetName, month, year);
-                    await excelService.CommitImportBatchAsync(stage.ImportBatchId, true, uid, uname, AppRoles.Administrator);
-                }
-
-                // Set active month to October 2026 by default
-                var settings = await db.CompanySettings.FirstOrDefaultAsync();
-                if (settings != null)
-                {
-                    settings.ActivePayrollMonth = 10;
-                    settings.ActivePayrollYear = 2026;
-                    await db.SaveChangesAsync();
-                }
-            }
         }
     }
 
