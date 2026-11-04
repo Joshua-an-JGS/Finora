@@ -6,9 +6,6 @@ import {
   History,
   FileText,
   CheckCircle2,
-  Cpu,
-  Database,
-  Monitor,
   Calendar,
   RefreshCw,
   LayoutDashboard,
@@ -25,17 +22,16 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
-import type { UpdateStatus, ReleaseHistoryItem, SystemInfo } from '../types/payroll';
+import type { UpdateStatus, ReleaseHistoryItem } from '../types/payroll';
 
 interface AboutViewProps {
   onNavigateToSettings?: () => void;
 }
 
 export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'system' | 'whats-new' | 'history' | 'license'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'whats-new' | 'history' | 'license'>('overview');
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [history, setHistory] = useState<ReleaseHistoryItem[]>([]);
-  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
   // Check for updates state within About page
   const [checking, setChecking] = useState(false);
@@ -47,15 +43,13 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
 
   const loadData = async () => {
     try {
-      const [statusRes, historyRes, sysRes] = await Promise.allSettled([
+      const [statusRes, historyRes] = await Promise.allSettled([
         apiRequest<UpdateStatus>('/api/updates/status'),
         apiRequest<ReleaseHistoryItem[]>('/api/updates/history'),
-        apiRequest<SystemInfo>('/api/updates/system-info'),
       ]);
 
       if (statusRes.status === 'fulfilled') setUpdateStatus(statusRes.value);
       if (historyRes.status === 'fulfilled') setHistory(historyRes.value);
-      if (sysRes.status === 'fulfilled') setSystemInfo(sysRes.value);
     } catch {
       // Fallback defaults
     }
@@ -197,7 +191,6 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
         <div className="flex items-center gap-1 border-b border-[#E5E7EB] -mb-[1px]">
           {[
             { key: 'overview', label: 'Overview', icon: <Layers className="w-4 h-4" /> },
-            { key: 'system', label: 'System Information', icon: <Cpu className="w-4 h-4" /> },
             { key: 'whats-new', label: "What's New", icon: <Sparkles className="w-4 h-4" /> },
             { key: 'history', label: 'Update History', icon: <History className="w-4 h-4" /> },
             { key: 'license', label: 'License & Credits', icon: <FileText className="w-4 h-4" /> },
@@ -301,100 +294,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
       )}
 
       {/* ====================================================================
-          TAB 2: SYSTEM INFORMATION
-      ==================================================================== */}
-      {activeTab === 'system' && (
-        <div className="space-y-6">
-          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm space-y-5">
-            <div>
-              <h2 className="text-[16px] font-semibold text-[#1F2937]">System &amp; Environment Diagnostics</h2>
-              <p className="text-[12.5px] text-[#6B7280] mt-0.5">
-                Technical environment metadata and storage paths for maintenance and support.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-6 text-[13px] pt-1">
-              <div className="space-y-3">
-                <div className="font-semibold text-[13.5px] text-[#1F2937] border-b border-[#E5E7EB] pb-2.5 flex items-center gap-2">
-                  <Monitor className="w-4 h-4 text-[#F47721]" />
-                  <span>Desktop Application Architecture</span>
-                </div>
-                <div className="space-y-2 text-[12.5px]">
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Installed Version:</span>
-                    <span className="font-mono font-semibold text-[#1F2937]">v{systemInfo?.version || '1.0.0'}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Build Identifier:</span>
-                    <span className="font-mono text-[#1F2937]">{systemInfo?.buildNumber || '2026.11.04-prod.x64'}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Release Date:</span>
-                    <span className="text-[#1F2937]">{systemInfo?.releaseDate || 'November 4, 2026'}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Target Platform:</span>
-                    <span className="text-[#1F2937]">Windows Desktop 64-bit (win32-x64)</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Operating System:</span>
-                    <span className="text-[#1F2937]">{systemInfo?.osVersion || 'Microsoft Windows 10/11'}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Desktop Shell:</span>
-                    <span className="text-[#1F2937]">Electron 35 / Chromium 134</span>
-                  </div>
-                  <div className="flex justify-between py-1.5">
-                    <span className="text-[#6B7280]">Frontend Framework:</span>
-                    <span className="text-[#1F2937]">React 19 · TypeScript 5.8 · Tailwind CSS</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="font-semibold text-[13.5px] text-[#1F2937] border-b border-[#E5E7EB] pb-2.5 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-[#F47721]" />
-                  <span>Backend Engine &amp; Storage Isolation</span>
-                </div>
-                <div className="space-y-2 text-[12.5px]">
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Backend Runtime:</span>
-                    <span className="font-semibold text-[#1F2937]">.NET 10.0 LTS (Kestrel Web API)</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Database Engine:</span>
-                    <span className="font-semibold text-[#1F2937]">PostgreSQL 18.0 (Embedded Cluster)</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Database Connectivity:</span>
-                    <span className="font-semibold text-[#059669] flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
-                      <span>Connected &amp; Healthy</span>
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Document Engine:</span>
-                    <span className="text-[#1F2937]">QuestPDF 2025 High-Fidelity Engine</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
-                    <span className="text-[#6B7280]">Persistent User Data:</span>
-                    <span className="font-mono text-[11px] text-[#1F2937] truncate max-w-[240px]" title={systemInfo?.baseDataDirectory}>
-                      {systemInfo?.baseDataDirectory || '%LOCALAPPDATA%\\FINORA'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-1.5">
-                    <span className="text-[#6B7280]">Data Safety:</span>
-                    <span className="font-medium text-[#F47721]">Isolated from Application Binaries</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====================================================================
-          TAB 3: WHAT'S NEW
+          TAB 2: WHAT'S NEW
       ==================================================================== */}
       {activeTab === 'whats-new' && (
         <div className="space-y-6">

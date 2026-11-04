@@ -199,11 +199,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           <>
             {/* Top Corporate Branding: Official Animated FINORA Splash Logo */}
             <div className="flex flex-col items-center justify-center pb-5 mb-5 border-b border-[#E5E7EB]">
-              <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[270px]">
+              <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[200px]">
                 <img
                   src="/splash_logo.png"
                   alt="FINORA — Finance &amp; Payroll Management System"
-                  className="w-full max-w-[270px] h-auto object-contain block relative z-[1]"
+                  className="w-full max-w-[200px] h-auto object-contain block relative z-[1]"
                 />
                 {/* Continuous Orange Light Sweep Overlay (1s sweep, 1s pause) */}
                 <div
@@ -345,11 +345,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             {/* Admin Header with Animated Logo & Administrator Badge */}
             <div className="text-center pb-4 border-b border-[#E5E7EB]">
               <div className="flex justify-center mb-3">
-                <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[240px]">
+                <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[190px]">
                   <img
                     src="/splash_logo.png"
                     alt="FINORA — Finance &amp; Payroll Management System"
-                    className="w-full max-w-[240px] h-auto object-contain block relative z-[1]"
+                    className="w-full max-w-[190px] h-auto object-contain block relative z-[1]"
                   />
                   <div
                     className="absolute inset-0 pointer-events-none z-[2] overflow-hidden"
