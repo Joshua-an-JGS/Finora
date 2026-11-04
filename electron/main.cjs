@@ -288,9 +288,16 @@ ipcMain.handle('updater:install', async () => {
   }
 });
 
+function getAppIcon() {
+  const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
+  if (fs.existsSync(iconPath)) return iconPath;
+  if (app.isPackaged) return process.execPath;
+  return undefined;
+}
+
 // 6. Create Splash Window
 function createSplashWindow() {
-  const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
+  const appIcon = getAppIcon();
   splashWindow = new BrowserWindow({
     width: 520,
     height: 360,
@@ -299,7 +306,7 @@ function createSplashWindow() {
     resizable: false,
     center: true,
     show: false,
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    icon: appIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -332,7 +339,7 @@ ipcMain.on('splash-fade-complete', () => {
 
 // 7. Create Main Application Window
 function createMainWindow(port) {
-  const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
+  const appIcon = getAppIcon();
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -340,7 +347,7 @@ function createMainWindow(port) {
     minWidth: 1024,
     minHeight: 700,
     title: 'FINORA — Finance & Payroll Management System',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    icon: appIcon,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#F8F9FA',

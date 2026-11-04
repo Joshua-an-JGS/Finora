@@ -61,6 +61,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "FINORA",
       "uninstallDisplayName": "FINORA Finance & Payroll Management System",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "runAfterFinish": true,
       "artifactName": "FINORA Setup.${ext}"
     }
