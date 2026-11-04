@@ -123,14 +123,14 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto text-[#1F2937]">
       {/* Top Hero Card / Product Identity */}
-      <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex flex-col items-start gap-2">
-            <div className="relative inline-flex items-center select-none overflow-hidden max-w-[280px]">
+      <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] px-6 pt-5 pb-0 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
+          <div className="space-y-1.5">
+            <div className="relative inline-flex items-center select-none overflow-hidden max-w-[230px]">
               <img
                 src="/splash_logo.png"
                 alt="FINORA — Finance &amp; Payroll Management System"
-                className="w-full max-w-[280px] h-auto object-contain block relative z-[1]"
+                className="w-full max-w-[230px] h-auto object-contain block relative z-[1]"
               />
               {/* Continuous Silky Orange Light Sweep Overlay */}
               <div
@@ -150,17 +150,17 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
                 <div className="logo-sweep-beam-login" />
               </div>
             </div>
-            <p className="text-[12px] text-[#6B7280] font-['Figtree'] max-w-[540px]">
+            <p className="text-[12px] text-[#6B7280] font-['Figtree'] leading-relaxed max-w-[540px]">
               Institutional desktop platform for end-to-end payroll administration and payslip compliance.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0 sm:self-center">
             <button
               type="button"
               onClick={handleManualCheck}
               disabled={checking}
-              className="px-4 py-2 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#F47721] hover:text-[#F47721] text-[#1F2937] text-[12.5px] font-semibold flex items-center gap-2 transition-colors shadow-sm"
+              className="px-3.5 py-1.5 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#F47721] hover:text-[#F47721] text-[#1F2937] text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#F47721] ${checking ? 'animate-spin' : ''}`} />
               <span>{checking ? 'Checking for Updates...' : 'Check for Updates'}</span>
@@ -169,7 +169,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
               <button
                 type="button"
                 onClick={onNavigateToSettings}
-                className="px-4 py-2 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] text-[12.5px] font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                className="px-3.5 py-1.5 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
               >
                 <span>Update Settings</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -179,7 +179,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
         </div>
 
         {checkResult && (
-          <div className={`mt-4 p-3 rounded-[8px] text-[12.5px] font-medium flex items-center gap-2 ${
+          <div className={`mb-3 p-2.5 rounded-[7px] text-[12px] font-medium flex items-center gap-2 ${
             checkResult.isError
               ? 'bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B]'
               : 'bg-[#FFF3E8] border border-[#F47721]/30 text-[#1F2937]'
@@ -194,7 +194,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
         )}
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1 border-b border-[#E5E7EB] mt-6 pt-2">
+        <div className="flex items-center gap-1 border-b border-[#E5E7EB] -mb-[1px]">
           {[
             { key: 'overview', label: 'Overview', icon: <Layers className="w-4 h-4" /> },
             { key: 'system', label: 'System Information', icon: <Cpu className="w-4 h-4" /> },
