@@ -37,6 +37,10 @@ public static class DatabaseInitializer
                 ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""LastUpdateInstalledAtUtc"" timestamp with time zone;
             ");
         }
+        else if (db.Database.IsSqlite())
+        {
+            await EnsureSqliteSchemaAsync(db);
+        }
 
         // 1. Seed Roles
         foreach (var role in AppRoles.All)
@@ -333,6 +337,69 @@ Accounts & Finance Department
         {
             await userManager.AddToRoleAsync(user, role);
         }
+    }
+
+    private static async Task EnsureSqliteSchemaAsync(ApplicationDbContext db)
+    {
+        var existingCompanySettingsCols = await GetSqliteColumnNamesAsync(db, "CompanySettings");
+        if (existingCompanySettingsCols.Count > 0)
+        {
+            var companySettingsCols = new (string Name, string TypeSql)[]
+            {
+                ("AutoCheckUpdates", "INTEGER NOT NULL DEFAULT 1"),
+                ("AutoDownloadUpdates", "INTEGER NOT NULL DEFAULT 0"),
+                ("NotifyBeforeInstall", "INTEGER NOT NULL DEFAULT 1"),
+                ("UpdateChannel", "TEXT NOT NULL DEFAULT 'Stable'"),
+                ("UpdateServerUrl", "TEXT NOT NULL DEFAULT 'https://github.com/Joshua-an-JGS/Finora'"),
+                ("LastUpdateCheckedAtUtc", "TEXT NULL"),
+                ("LastUpdateInstalledAtUtc", "TEXT NULL")
+            };
+
+            foreach (var (colName, colDef) in companySettingsCols)
+            {
+                if (!existingCompanySettingsCols.Contains(colName))
+                {
+                    await db.Database.ExecuteSqlRawAsync($"ALTER TABLE \"CompanySettings\" ADD COLUMN \"{colName}\" {colDef};");
+                }
+            }
+        }
+
+        var existingPayrollCols = await GetSqliteColumnNamesAsync(db, "PayrollRecords");
+        if (existingPayrollCols.Count > 0 && !existingPayrollCols.Contains("OverrideEmployeeCode"))
+        {
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"PayrollRecords\" ADD COLUMN \"OverrideEmployeeCode\" TEXT NULL;");
+        }
+    }
+
+    private static async Task<HashSet<string>> GetSqliteColumnNamesAsync(ApplicationDbContext db, string tableName)
+    {
+        var cols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var conn = db.Database.GetDbConnection();
+        bool wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
+        {
+            await conn.OpenAsync();
+        }
+
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info(\"{tableName}\");";
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                cols.Add(reader.GetString(1));
+            }
+        }
+        finally
+        {
+            if (!wasOpen && conn.State == System.Data.ConnectionState.Open)
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        return cols;
     }
 }
 
