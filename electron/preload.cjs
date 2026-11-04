@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onReady: (callback) => ipcRenderer.on('backend-ready', (_event, value) => callback(value)),
   onInitError: (callback) => ipcRenderer.on('backend-error', (_event, error) => callback(error)),
+  onSplashFadeComplete: () => ipcRenderer.send('splash-fade-complete'),
   updater: {
     check: () => ipcRenderer.invoke('updater:check'),
     download: () => ipcRenderer.invoke('updater:download'),

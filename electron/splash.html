@@ -24,19 +24,28 @@
       justify-content: center;
     }
 
-    /* Outer wrapper providing 10px margin for natural drop shadow on Windows */
+    /* Outer wrapper providing padding for natural drop shadow on Windows */
     .splash-container {
       width: 500px;
       height: 340px;
       background: #FFFFFF;
       border: 1px solid #E5E7EB;
       border-radius: 14px;
-      box-shadow: 0 16px 38px -8px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 18px 42px -8px rgba(15, 23, 42, 0.12), 0 4px 14px -2px rgba(0, 0, 0, 0.04);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       overflow: hidden;
       position: relative;
+      will-change: opacity, transform;
+      transition: opacity 380ms cubic-bezier(0.4, 0, 0.2, 1), transform 380ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Exit animation state before transitioning to main login window */
+    .splash-container.fade-exit {
+      opacity: 0;
+      transform: scale(0.985);
+      pointer-events: none;
     }
 
     /* Main central content */
@@ -49,15 +58,50 @@
       padding: 40px 32px 24px 32px;
     }
 
-    /* Centered official FINORA logo */
-    .logo-wrapper {
-      display: flex;
+    /* 
+      1. Primary Animation Container:
+         - Fade In & Scale Reveal (800ms)
+         - Subtle Breathing Effect after reveal (3.5s loop)
+    */
+    .logo-container {
+      position: relative;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       margin-bottom: 34px;
       pointer-events: none;
+      animation: logoReveal 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: opacity, transform;
     }
 
+    /* Subtle breathing mode activated after initial reveal */
+    .logo-container.breathing {
+      animation: logoBreathe 3.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes logoReveal {
+      0% {
+        opacity: 0;
+        transform: scale(0.96) translateZ(0);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateZ(0);
+      }
+    }
+
+    @keyframes logoBreathe {
+      0% {
+        transform: scale(1) translateZ(0);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1.008) translateZ(0);
+        opacity: 0.985;
+      }
+    }
+
+    /* Official unchanged FINORA logo image */
     .logo-img {
       width: 290px;
       max-width: 100%;
@@ -65,9 +109,81 @@
       object-fit: contain;
       display: block;
       image-rendering: -webkit-optimize-contrast;
+      position: relative;
+      z-index: 1;
     }
 
-    /* Progress and status section */
+    /* 
+      Stage 3: Subtle Orange Light Sweep
+      - Runs exactly ONCE starting at 800ms (duration 900ms)
+      - Perfectly masked to the exact silhouette of the official FINORA logo
+      - Gentle orange tint with soft white gleaming crest
+    */
+    .logo-sweep-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+      -webkit-mask-image: url('../logo/splash%20logo.png');
+      -webkit-mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-image: url('../logo/splash%20logo.png');
+      mask-size: contain;
+      mask-repeat: no-repeat;
+      mask-position: center;
+      overflow: hidden;
+      opacity: 0;
+      animation: sweepGleam 950ms cubic-bezier(0.4, 0, 0.2, 1) 800ms 1 forwards;
+    }
+
+    .logo-sweep-beam {
+      position: absolute;
+      top: -20%;
+      left: -100%;
+      width: 70%;
+      height: 140%;
+      background: linear-gradient(
+        105deg,
+        rgba(244, 119, 33, 0) 0%,
+        rgba(244, 119, 33, 0.14) 25%,
+        rgba(255, 255, 255, 0.85) 50%,
+        rgba(244, 119, 33, 0.22) 65%,
+        rgba(244, 119, 33, 0) 100%
+      );
+      transform: skewX(-22deg) translateZ(0);
+      will-change: transform;
+      animation: sweepMove 950ms cubic-bezier(0.4, 0, 0.2, 1) 800ms 1 forwards;
+    }
+
+    @keyframes sweepGleam {
+      0% {
+        opacity: 0;
+      }
+      20% {
+        opacity: 1;
+      }
+      80% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes sweepMove {
+      0% {
+        transform: translateX(0%) skewX(-22deg);
+      }
+      100% {
+        transform: translateX(380%) skewX(-22deg);
+      }
+    }
+
+    /* 3. Progress Bar Animation */
     .loading-section {
       display: flex;
       flex-direction: column;
@@ -90,17 +206,33 @@
       background: linear-gradient(90deg, #F47721 0%, #FF8A3D 100%);
       border-radius: 9999px;
       transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+      will-change: width;
+    }
+
+    /* 4. Loading Status Animation with smooth 250ms fade transition */
+    .status-container {
+      margin-top: 12px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .status-text {
-      margin-top: 12px;
       font-size: 12px;
       font-weight: 500;
       color: #6B7280;
       letter-spacing: 0.15px;
       text-align: center;
-      transition: color 0.3s ease;
-      min-height: 18px;
+      transition: opacity 250ms ease, transform 250ms ease, color 0.3s ease;
+      opacity: 1;
+      transform: translateY(0);
+      will-change: opacity, transform;
+    }
+
+    .status-text.fade-out {
+      opacity: 0;
+      transform: translateY(-2px);
     }
 
     .status-text.error {
@@ -133,18 +265,44 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       letter-spacing: 0.2px;
     }
+
+    /* Accessibility: Respect user motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+      .logo-container,
+      .logo-container.breathing,
+      .logo-sweep-overlay,
+      .logo-sweep-beam,
+      .splash-container {
+        animation: none !important;
+        transition: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+      .logo-sweep-overlay {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="splash-container">
+  <div class="splash-container" id="splashContainer">
     <div class="splash-body">
-      <!-- Centered Official FINORA Logo from project logo folder -->
-      <div class="logo-wrapper">
+      <!-- 
+        Centered Official FINORA Logo
+        Stage 1: Fade In (800ms)
+        Stage 2: Gentle Scale Reveal (800ms)
+        Stage 3: Subtle Orange Light Sweep (900ms)
+      -->
+      <div class="logo-container" id="logoContainer">
         <img
           class="logo-img"
           src="../logo/splash%20logo.png"
           alt="FINORA — Finance &amp; Payroll Management System"
         />
+        <!-- Narrow, subtle orange light sweep overlay -->
+        <div class="logo-sweep-overlay" id="sweepOverlay" aria-hidden="true">
+          <div class="logo-sweep-beam"></div>
+        </div>
       </div>
 
       <!-- Minimal slim loading progress bar & dynamic status -->
@@ -152,8 +310,10 @@
         <div class="progress-track">
           <div class="progress-fill" id="progressFill"></div>
         </div>
-        <div class="status-text" id="statusMessage">
-          Starting FINORA...
+        <div class="status-container">
+          <div class="status-text" id="statusMessage">
+            Starting FINORA...
+          </div>
         </div>
       </div>
     </div>
@@ -196,15 +356,34 @@
         versionEl.textContent = 'v1.0.0';
       }
 
-      // 2. Loading Progress State Management
-      const fillEl = document.getElementById('progressFill');
+      // 2. Logo Reveal and Subtle Breathing Sequence
+      const logoEl = document.getElementById('logoContainer');
+      // After reveal (800ms) and light sweep (950ms) complete (~1750ms), activate gentle breathing
+      setTimeout(() => {
+        if (logoEl && !document.getElementById('splashContainer').classList.contains('fade-exit')) {
+          logoEl.classList.add('breathing');
+        }
+      }, 1800);
+
+      // 3. Status Transition Helper with subtle 250ms fade
       const statusEl = document.getElementById('statusMessage');
+      function setStatus(text) {
+        if (!statusEl || statusEl.textContent === text) return;
+        statusEl.classList.add('fade-out');
+        setTimeout(() => {
+          statusEl.textContent = text;
+          statusEl.classList.remove('fade-out');
+        }, 220);
+      }
+
+      // 4. Loading Progress State Management (Clean Non-Technical Messages)
+      const fillEl = document.getElementById('progressFill');
+      const splashContainer = document.getElementById('splashContainer');
 
       const stages = [
         { pct: 15, msg: 'Starting FINORA...', delay: 0 },
-        { pct: 45, msg: 'Preparing application...', delay: 450 },
-        { pct: 72, msg: 'Loading workspace...', delay: 1100 },
-        { pct: 88, msg: 'Loading workspace...', delay: 1800 }
+        { pct: 45, msg: 'Preparing your workspace...', delay: 450 },
+        { pct: 72, msg: 'Loading application...', delay: 1100 }
       ];
 
       stages.forEach(stage => {
@@ -213,25 +392,47 @@
           statusEl.textContent = stage.msg;
         } else {
           setTimeout(() => {
-            // Only update if not completed or errored
             if (!fillEl.dataset.completed && !fillEl.dataset.errored) {
               fillEl.style.width = stage.pct + '%';
-              statusEl.textContent = stage.msg;
+              setStatus(stage.msg);
             }
           }, stage.delay);
         }
       });
 
-      // 3. Electron Backend Ready Event Listener
+      // 5. Final Animation: Transition to Login Window
+      let hasCompleted = false;
+      function handleAppReady() {
+        if (hasCompleted) return;
+        hasCompleted = true;
+        fillEl.dataset.completed = 'true';
+
+        // Stage 1: Complete progress bar & show 'Almost ready...'
+        fillEl.style.width = '100%';
+        setStatus('Almost ready...');
+
+        // Stage 2: Brief pause (300ms) with full logo visible
+        setTimeout(() => {
+          // Stage 3: Smooth splash exit fade (350ms)
+          splashContainer.classList.add('fade-exit');
+
+          // Stage 4: Signal Electron main process to reveal login window
+          setTimeout(() => {
+            if (window.electronAPI && typeof window.electronAPI.onSplashFadeComplete === 'function') {
+              window.electronAPI.onSplashFadeComplete();
+            }
+          }, 360);
+        }, 300);
+      }
+
+      // Listen for Electron backend-ready event
       if (window.electronAPI && typeof window.electronAPI.onReady === 'function') {
         window.electronAPI.onReady(() => {
-          fillEl.dataset.completed = 'true';
-          fillEl.style.width = '100%';
-          statusEl.textContent = 'Almost ready...';
+          handleAppReady();
         });
       }
 
-      // 4. Electron Initialization Error Listener
+      // Electron Initialization Error Listener
       if (window.electronAPI && typeof window.electronAPI.onInitError === 'function') {
         window.electronAPI.onInitError((errMsg) => {
           fillEl.dataset.errored = 'true';

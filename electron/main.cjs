@@ -315,6 +315,21 @@ function createSplashWindow() {
   });
 }
 
+let splashFaded = false;
+
+ipcMain.on('splash-fade-complete', () => {
+  logBoot('IPC splash-fade-complete received');
+  splashFaded = true;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.close();
+      splashWindow = null;
+    }
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
 // 7. Create Main Application Window
 function createMainWindow(port) {
   const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
@@ -342,12 +357,15 @@ function createMainWindow(port) {
   mainWindow.loadURL(`http://127.0.0.1:${port}`);
 
   mainWindow.once('ready-to-show', () => {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.close();
-      splashWindow = null;
+    logBoot(`mainWindow ready-to-show, splashFaded=${splashFaded}`);
+    if (splashFaded || !splashWindow || splashWindow.isDestroyed()) {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close();
+        splashWindow = null;
+      }
+      mainWindow.show();
+      mainWindow.focus();
     }
-    mainWindow.show();
-    mainWindow.focus();
 
     // Automatic Update Check (initial 6s delay, then every 24 hours)
     setTimeout(() => {
@@ -415,11 +433,9 @@ app.whenReady().then(async () => {
       splashWindow.webContents.send('backend-ready', true);
     }
 
-    // Small delay for smooth transition
-    setTimeout(() => {
-      logBoot('Creating main window');
-      createMainWindow(assignedPort);
-    }, 600);
+    // Create main window in parallel (hidden) so it is ready when splash fade finishes
+    logBoot('Creating main window in parallel');
+    createMainWindow(assignedPort);
   } catch (err) {
     logBoot(`Startup error: ${err.message}`);
     console.error('FINORA failed to initialize:', err);
