@@ -117,8 +117,8 @@ input[type="radio"] {
 }
 
 /* ============================================================================
-   Animated Official FINORA Splash Logo (Login Screen & Brand Cards)
-   Periodic Orange Light Sweep every 1 second (2s cycle: 1s sweep, 1s pause)
+   Animated Official FINORA Splash Logo (Login Screen, About Page, Brand Cards)
+   Silky, Smooth Orange Light Sweep (3.2s cycle: ~1.6s graceful sweep, ~1.6s pause)
    ============================================================================ */
 .logo-sweep-beam-login {
   position: absolute;
@@ -129,14 +129,14 @@ input[type="radio"] {
   background: linear-gradient(
     105deg,
     rgba(244, 119, 33, 0) 0%,
-    rgba(244, 119, 33, 0.2) 25%,
-    rgba(255, 255, 255, 0.9) 50%,
+    rgba(244, 119, 33, 0.22) 25%,
+    rgba(255, 255, 255, 0.92) 50%,
     rgba(244, 119, 33, 0.28) 65%,
     rgba(244, 119, 33, 0) 100%
   );
   transform: skewX(-22deg) translateZ(0);
   will-change: transform, opacity;
-  animation: loginSweepLoop 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: loginSweepLoop 3.2s cubic-bezier(0.35, 0, 0.25, 1) infinite;
 }
 
 @keyframes loginSweepLoop {
@@ -144,10 +144,10 @@ input[type="radio"] {
     transform: translateX(0%) skewX(-22deg);
     opacity: 0;
   }
-  5% {
+  6% {
     opacity: 1;
   }
-  45% {
+  44% {
     opacity: 1;
   }
   50% {

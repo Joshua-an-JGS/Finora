@@ -125,25 +125,34 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
       {/* Top Hero Card / Product Identity */}
       <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] p-6 shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-[68px] h-[68px] rounded-[12px] bg-[#FFF3E8] border border-[#F47721]/20 flex items-center justify-center p-1.5 shrink-0 shadow-sm">
+          <div className="flex flex-col items-start gap-2">
+            <div className="relative inline-flex items-center select-none overflow-hidden max-w-[280px]">
               <img
-                src="/finora_logo.png"
-                alt="FINORA Logo"
-                className="w-full h-full object-contain"
+                src="/splash_logo.png"
+                alt="FINORA — Finance &amp; Payroll Management System"
+                className="w-full max-w-[280px] h-auto object-contain block relative z-[1]"
               />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-[26px] font-bold text-[#1F2937] tracking-tight">FINORA</h1>
+              {/* Continuous Silky Orange Light Sweep Overlay */}
+              <div
+                className="absolute inset-0 pointer-events-none z-[2] overflow-hidden"
+                style={{
+                  WebkitMaskImage: 'url(/splash_logo.png)',
+                  WebkitMaskSize: 'contain',
+                  WebkitMaskRepeat: 'no-repeat',
+                  WebkitMaskPosition: 'left center',
+                  maskImage: 'url(/splash_logo.png)',
+                  maskSize: 'contain',
+                  maskRepeat: 'no-repeat',
+                  maskPosition: 'left center',
+                }}
+                aria-hidden="true"
+              >
+                <div className="logo-sweep-beam-login" />
               </div>
-              <p className="text-[13px] font-medium text-[#6B7280] mt-0.5">
-                Finance &amp; Payroll Management System
-              </p>
-              <p className="text-[12px] text-[#9CA3AF] mt-1 font-['Figtree']">
-                Institutional desktop platform for end-to-end payroll administration and payslip compliance.
-              </p>
             </div>
+            <p className="text-[12px] text-[#6B7280] font-['Figtree'] max-w-[540px]">
+              Institutional desktop platform for end-to-end payroll administration and payslip compliance.
+            </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
