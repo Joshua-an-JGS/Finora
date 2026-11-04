@@ -10,7 +10,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
   onReady: (callback) => ipcRenderer.on('backend-ready', (_event, value) => callback(value)),
-  onInitError: (callback) => ipcRenderer.on('backend-error', (_event, error) => callback(error))
+  onInitError: (callback) => ipcRenderer.on('backend-error', (_event, error) => callback(error)),
+  updater: {
+    check: () => ipcRenderer.invoke('updater:check'),
+    download: () => ipcRenderer.invoke('updater:download'),
+    install: () => ipcRenderer.invoke('updater:install'),
+    onEvent: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on('updater:event', handler);
+      return () => ipcRenderer.removeListener('updater:event', handler);
+    }
+  }
 });
 
 

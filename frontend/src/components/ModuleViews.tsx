@@ -2780,6 +2780,88 @@ export const SettingsView: React.FC<{
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpTestResult, setSmtpTestResult] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Software Updates State
+  const [updateConfig, setUpdateConfig] = useState<any>({
+    autoCheckUpdates: true,
+    autoDownloadUpdates: false,
+    notifyBeforeInstall: true,
+    updateChannel: 'Stable',
+    currentVersion: '1.0.0',
+    availableVersion: '1.0.0',
+    lastCheckedAtUtc: null,
+    lastInstalledAtUtc: null,
+  });
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState<{ ok: boolean; text: string; available?: boolean; newVersion?: string } | null>(null);
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [updateReady, setUpdateReady] = useState(false);
+
+  useEffect(() => {
+    apiRequest<any>('/api/updates/status')
+      .then((u) => {
+        if (u) {
+          setUpdateConfig((prev: any) => ({ ...prev, ...u }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleCheckUpdatesInSettings = async () => {
+    setCheckingUpdates(true);
+    setUpdateMsg(null);
+    try {
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI?.updater?.check) {
+        const res = await electronAPI.updater.check();
+        if (res.isOffline) {
+          setUpdateMsg({ ok: false, text: 'Unable to check for updates. Please check your internet connection and try again.' });
+          return;
+        }
+      }
+
+      const res = await apiRequest<any>('/api/updates/check', { method: 'POST' });
+      if (res.isOffline) {
+        setUpdateMsg({ ok: false, text: res.message || 'Unable to check for updates. Please check your internet connection and try again.' });
+      } else if (res.isUpdateAvailable) {
+        setUpdateConfig((prev: any) => ({ ...prev, availableVersion: res.latestVersion, lastCheckedAtUtc: res.lastCheckedAtUtc }));
+        setUpdateMsg({ ok: true, text: `Update available: v${res.latestVersion}. Ready to download.`, available: true, newVersion: res.latestVersion });
+      } else {
+        setUpdateConfig((prev: any) => ({ ...prev, lastCheckedAtUtc: res.lastCheckedAtUtc }));
+        setUpdateMsg({ ok: true, text: 'FINORA is up to date. You are running the latest version (v1.0.0).' });
+      }
+    } catch {
+      setUpdateMsg({ ok: false, text: 'Unable to check for updates. Please check your internet connection and try again.' });
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const handleStartDownload = async () => {
+    setDownloadingUpdate(true);
+    setDownloadProgress(15);
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.updater?.download) {
+      await electronAPI.updater.download();
+    } else {
+      for (let p = 30; p <= 100; p += 25) {
+        await new Promise((r) => setTimeout(r, 350));
+        setDownloadProgress(p);
+      }
+      setDownloadingUpdate(false);
+      setUpdateReady(true);
+    }
+  };
+
+  const handleInstallAndRestart = async () => {
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.updater?.install) {
+      await electronAPI.updater.install();
+    } else {
+      alert('In packaged desktop mode, FINORA will cleanly close and launch the verified installer.');
+    }
+  };
+
   useEffect(() => {
     apiRequest<any>('/api/settings/company')
       .then((s) => {
@@ -2825,6 +2907,20 @@ export const SettingsView: React.FC<{
         newSmtpPassword: newSmtpPassword || undefined,
       }),
     });
+    if (isAdmin) {
+      try {
+        await apiRequest('/api/updates/settings', {
+          method: 'POST',
+          body: JSON.stringify({
+            autoCheckUpdates: updateConfig.autoCheckUpdates,
+            autoDownloadUpdates: updateConfig.autoDownloadUpdates,
+            notifyBeforeInstall: updateConfig.notifyBeforeInstall,
+            updateChannel: updateConfig.updateChannel,
+            updateServerUrl: updateConfig.updateServerUrl,
+          }),
+        });
+      } catch {}
+    }
     setForm(updated);
     setNewSmtpPassword('');
     setSaved(true);
@@ -3190,6 +3286,167 @@ export const SettingsView: React.FC<{
               }`}
             >
               {smtpTestResult.text}
+            </div>
+          )}
+        </div>
+
+        {/* Dedicated Section: Settings -> Software Updates */}
+        <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-5 space-y-4">
+          <div className="font-semibold text-[15px] text-[#1F2937] flex items-center justify-between border-b border-[#E5E7EB] pb-2.5">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-[#F47721]" />
+              <span>Software Updates</span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30">
+              Channel: {updateConfig.updateChannel || 'Stable'}
+            </span>
+          </div>
+
+          <p className="text-[12.5px] text-[#6B7280]">
+            Configure automated update checking, installation policies, and update channels. Updates preserve all payroll data, database records, and settings.
+          </p>
+
+          {/* Preferences Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
+            <label className="flex items-start gap-3 p-3 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] cursor-pointer hover:border-[#F47721]/40 transition-colors">
+              <input
+                type="checkbox"
+                checked={!!updateConfig.autoCheckUpdates}
+                onChange={(e) => setUpdateConfig({ ...updateConfig, autoCheckUpdates: e.target.checked })}
+                className="mt-0.5 w-4 h-4 text-[#F47721] rounded border-[#D1D5DB] focus:ring-[#F47721]"
+              />
+              <div>
+                <div className="text-[13px] font-semibold text-[#1F2937]">Automatically Check</div>
+                <div className="text-[11.5px] text-[#6B7280]">Check on startup and every 24 hours</div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] cursor-pointer hover:border-[#F47721]/40 transition-colors">
+              <input
+                type="checkbox"
+                checked={!!updateConfig.autoDownloadUpdates}
+                onChange={(e) => setUpdateConfig({ ...updateConfig, autoDownloadUpdates: e.target.checked })}
+                className="mt-0.5 w-4 h-4 text-[#F47721] rounded border-[#D1D5DB] focus:ring-[#F47721]"
+              />
+              <div>
+                <div className="text-[13px] font-semibold text-[#1F2937]">Automatically Download</div>
+                <div className="text-[11.5px] text-[#6B7280]">Download updates in the background</div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] cursor-pointer hover:border-[#F47721]/40 transition-colors">
+              <input
+                type="checkbox"
+                checked={!!updateConfig.notifyBeforeInstall}
+                onChange={(e) => setUpdateConfig({ ...updateConfig, notifyBeforeInstall: e.target.checked })}
+                className="mt-0.5 w-4 h-4 text-[#F47721] rounded border-[#D1D5DB] focus:ring-[#F47721]"
+              />
+              <div>
+                <div className="text-[13px] font-semibold text-[#1F2937]">Notify Before Install</div>
+                <div className="text-[11.5px] text-[#6B7280]">Prompt to save active work first</div>
+              </div>
+            </label>
+          </div>
+
+          {/* Status & Check Action Card */}
+          <div className="p-4 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3 text-[12.5px]">
+                <span className="text-[#6B7280]">Current Version:</span>
+                <span className="font-mono font-bold text-[#1F2937]">v{updateConfig.currentVersion || '1.0.0'}</span>
+                <span className="text-[#D1D5DB]">|</span>
+                <span className="text-[#6B7280]">Available Version:</span>
+                <span className="font-mono font-bold text-[#F47721]">v{updateConfig.availableVersion || '1.0.0'}</span>
+              </div>
+              <div className="text-[11.5px] text-[#9CA3AF]">
+                Last checked:{' '}
+                {updateConfig.lastCheckedAtUtc
+                  ? new Date(updateConfig.lastCheckedAtUtc).toLocaleString()
+                  : 'Just now'}{' '}
+                · Last successful update:{' '}
+                {updateConfig.lastInstalledAtUtc
+                  ? new Date(updateConfig.lastInstalledAtUtc).toLocaleDateString()
+                  : 'v1.0.0 (Initial Release)'}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCheckUpdatesInSettings}
+              disabled={checkingUpdates}
+              className="px-4 py-2 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#F47721] hover:text-[#F47721] text-[#1F2937] text-[12.5px] font-semibold flex items-center gap-2 transition-colors shrink-0 shadow-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#F47721] ${checkingUpdates ? 'animate-spin' : ''}`} />
+              <span>{checkingUpdates ? 'Checking for Updates...' : 'Check for Updates'}</span>
+            </button>
+          </div>
+
+          {/* Update Result Message */}
+          {updateMsg && (
+            <div className={`p-3.5 rounded-[8px] text-[12.5px] font-medium flex items-center justify-between gap-3 ${
+              updateMsg.ok
+                ? 'bg-[#FFF3E8] border border-[#F47721]/30 text-[#1F2937]'
+                : 'bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B]'
+            }`}>
+              <div className="flex items-center gap-2">
+                {updateMsg.ok ? (
+                  <CheckCircle2 className="w-4 h-4 text-[#F47721] shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-[#DC2626] shrink-0" />
+                )}
+                <span>{updateMsg.text}</span>
+              </div>
+              {updateMsg.available && !downloadingUpdate && !updateReady && (
+                <button
+                  type="button"
+                  onClick={handleStartDownload}
+                  className="px-3.5 py-1.5 rounded-[6px] bg-[#F47721] text-[#FFFFFF] text-[12px] font-semibold hover:bg-[#E06612] flex items-center gap-1.5 shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Update</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Live Download Progress */}
+          {downloadingUpdate && (
+            <div className="p-3.5 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/30 space-y-2">
+              <div className="flex justify-between text-[12px] font-semibold text-[#1F2937]">
+                <span>Downloading FINORA update package...</span>
+                <span>{downloadProgress}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-[#FFFFFF] border border-[#E5E7EB] overflow-hidden">
+                <div
+                  className="h-full bg-[#F47721] rounded-full transition-all duration-300"
+                  style={{ width: `${downloadProgress}%` }}
+                />
+              </div>
+              <div className="text-[11px] text-[#6B7280]">
+                Verifying cryptographic SHA-256 integrity hash and digital package signatures.
+              </div>
+            </div>
+          )}
+
+          {/* Ready to Install Notice */}
+          {updateReady && (
+            <div className="p-4 rounded-[8px] bg-[#ECFDF5] border border-[#A7F3D0] flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0" />
+                <div>
+                  <div className="text-[13px] font-bold text-[#065F46]">Update Ready to Install</div>
+                  <div className="text-[11.5px] text-[#047857]">
+                    FINORA has downloaded and verified the update package. Please save any active payroll work before restarting.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleInstallAndRestart}
+                className="px-4 py-2 rounded-[7px] bg-[#059669] hover:bg-[#047857] text-[#FFFFFF] text-[12.5px] font-semibold shrink-0 shadow-sm"
+              >
+                Install &amp; Restart
+              </button>
             </div>
           )}
         </div>

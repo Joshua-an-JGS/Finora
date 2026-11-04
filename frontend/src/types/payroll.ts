@@ -54,7 +54,8 @@ export interface PayslipTemplateConfig {
   showEmployeeEmail: boolean;
   showPayrollPeriodInDetails: boolean;
 
-  tableLayoutMode: 'SideBySide' | 'Stacked';
+  tableLayoutMode: 'SideBySide' | 'Stacked';
+
   additionalTablesLayoutMode?: 'Auto' | 'SideBySide' | 'Stacked';
   earningsSectionHeading: string;
   deductionsSectionHeading: string;
@@ -141,7 +142,8 @@ export interface CustomPayslipTable {
   showBorder: boolean;
   isVisible: boolean;
   headingBgColor?: string | null;
-  headingTextColor?: string | null;
+  headingTextColor?: string | null;
+
   layoutWidth?: 'auto' | 'half' | 'full';
 }
 
@@ -400,3 +402,69 @@ export interface EmailHistoryItem {
   completedAtUtc?: string | null;
 }
 
+
+export interface UpdateStatus {
+  currentVersion: string;
+  latestVersion: string;
+  isUpdateAvailable: boolean;
+  updateChannel: string;
+  autoCheckUpdates: boolean;
+  autoDownloadUpdates: boolean;
+  notifyBeforeInstall: boolean;
+  updateServerUrl?: string;
+  lastCheckedAtUtc?: string | null;
+  lastInstalledAtUtc?: string | null;
+  installationDateUtc?: string;
+  platform: string;
+  architecture: string;
+  runtime: string;
+  databaseEngine: string;
+  buildNumber: string;
+  releaseDate: string;
+  license: string;
+  developer: string;
+  attribution: string;
+  releaseName?: string;
+  releaseNotes?: string;
+  publishedAt?: string;
+  downloadUrl?: string;
+  totalBytes?: number;
+  message?: string;
+  isOffline?: boolean;
+}
+
+export interface ReleaseHistoryItem {
+  version: string;
+  releaseDate: string;
+  releaseType: string;
+  isCurrent: boolean;
+  summary: string;
+  newFeatures: string[];
+  improvements: string[];
+  bugFixes: string[];
+}
+
+export interface SystemInfo {
+  applicationName: string;
+  applicationTitle: string;
+  version: string;
+  buildNumber: string;
+  releaseDate: string;
+  platform: string;
+  osVersion: string;
+  is64BitOperatingSystem: boolean;
+  is64BitProcess: boolean;
+  processorCount: number;
+  runtimeFramework: string;
+  desktopShell: string;
+  frontendEngine: string;
+  documentEngine: string;
+  databaseEngine: string;
+  databaseConnected: boolean;
+  baseDataDirectory: string;
+  logsDirectory: string;
+  documentsDirectory: string;
+  developer: string;
+  attribution: string;
+  serverTimeUtc: string;
+}

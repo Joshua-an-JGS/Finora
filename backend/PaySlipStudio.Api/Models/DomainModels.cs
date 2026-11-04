@@ -105,6 +105,20 @@ public class CompanySettings
 
     public int DocumentRetentionDays { get; set; } = 1095;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    // Software Update Configuration
+    public bool AutoCheckUpdates { get; set; } = true;
+    public bool AutoDownloadUpdates { get; set; } = false;
+    public bool NotifyBeforeInstall { get; set; } = true;
+
+    [MaxLength(50)]
+    public string UpdateChannel { get; set; } = "Stable";
+
+    [MaxLength(300)]
+    public string UpdateServerUrl { get; set; } = "https://github.com/Joshua-an-JGS/Finora";
+
+    public DateTime? LastUpdateCheckedAtUtc { get; set; }
+    public DateTime? LastUpdateInstalledAtUtc { get; set; }
 }
 
 public class PayrollPeriod

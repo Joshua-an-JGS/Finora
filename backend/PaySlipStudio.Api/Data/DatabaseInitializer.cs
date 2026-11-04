@@ -28,6 +28,13 @@ public static class DatabaseInitializer
                 ALTER TABLE ""EmailDeliveryAttempts"" ALTER COLUMN ""Subject"" TYPE character varying(512);
                 ALTER TABLE ""EmailDeliveryAttempts"" ALTER COLUMN ""ProviderMessageId"" TYPE character varying(512);
                 ALTER TABLE ""AuditLogEntries"" ALTER COLUMN ""Summary"" TYPE character varying(2000);
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""AutoCheckUpdates"" boolean DEFAULT true;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""AutoDownloadUpdates"" boolean DEFAULT false;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""NotifyBeforeInstall"" boolean DEFAULT true;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""UpdateChannel"" character varying(50) DEFAULT 'Stable';
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""UpdateServerUrl"" character varying(300) DEFAULT 'https://github.com/Joshua-an-JGS/Finora';
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""LastUpdateCheckedAtUtc"" timestamp with time zone;
+                ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""LastUpdateInstalledAtUtc"" timestamp with time zone;
             ");
         }
 

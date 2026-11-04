@@ -164,6 +164,131 @@ ipcMain.on('get-app-version-sync', (event) => {
 });
 
 // 6. Create Splash Window
+let autoUpdater = null;
+try {
+  const updaterModule = require('electron-updater');
+  autoUpdater = updaterModule.autoUpdater;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowDowngrade = false;
+  logBoot('electron-updater initialized successfully');
+} catch (err) {
+  logBoot(`Failed to initialize electron-updater: ${err.message}`);
+}
+
+function setupUpdaterEvents() {
+  if (!autoUpdater) return;
+
+  autoUpdater.on('checking-for-update', () => {
+    logBoot('autoUpdater: checking-for-update');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('updater:event', { type: 'checking' });
+    }
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    logBoot(`autoUpdater: update-available v${info.version}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('updater:event', {
+        type: 'available',
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseNotes: info.releaseNotes,
+        files: info.files
+      });
+    }
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    logBoot(`autoUpdater: update-not-available (current: ${app.getVersion()})`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('updater:event', {
+        type: 'not-available',
+        version: app.getVersion()
+      });
+    }
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('updater:event', {
+        type: 'progress',
+        percent: Math.round(progressObj.percent || 0),
+        transferred: progressObj.transferred || 0,
+        total: progressObj.total || 0,
+        bytesPerSecond: progressObj.bytesPerSecond || 0
+      });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    logBoot(`autoUpdater: update-downloaded v${info.version}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('updater:event', {
+        type: 'downloaded',
+        version: info.version,
+        releaseNotes: info.releaseNotes
+      });
+    }
+  });
+
+  autoUpdater.on('error', (err) => {
+    logBoot(`autoUpdater: error ${err.message}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('updater:event', {
+        type: 'error',
+        message: err.message
+      });
+    }
+  });
+}
+
+setupUpdaterEvents();
+
+// Register IPC handlers for software updates
+ipcMain.handle('updater:check', async () => {
+  if (!autoUpdater) return { success: false, message: 'Updater not available in development environment' };
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { success: true, updateInfo: result?.updateInfo };
+  } catch (err) {
+    logBoot(`updater:check error: ${err.message}`);
+    const isOffline = err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED' || err.message?.includes('net::ERR');
+    return {
+      success: false,
+      isOffline,
+      message: isOffline
+        ? 'Unable to check for updates. Please check your internet connection and try again.'
+        : err.message
+    };
+  }
+});
+
+ipcMain.handle('updater:download', async () => {
+  if (!autoUpdater) return { success: false, message: 'Updater not available' };
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (err) {
+    logBoot(`updater:download error: ${err.message}`);
+    return { success: false, message: err.message };
+  }
+});
+
+ipcMain.handle('updater:install', async () => {
+  if (!autoUpdater) return { success: false, message: 'Updater not available' };
+  try {
+    logBoot('updater:install invoked, shutting down backend cleanly');
+    cleanupBackend();
+    autoUpdater.quitAndInstall(false, true);
+    return { success: true };
+  } catch (err) {
+    logBoot(`updater:install error: ${err.message}`);
+    return { success: false, message: err.message };
+  }
+});
+
+// 6. Create Splash Window
 function createSplashWindow() {
   const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
   splashWindow = new BrowserWindow({
@@ -223,6 +348,21 @@ function createMainWindow(port) {
     }
     mainWindow.show();
     mainWindow.focus();
+
+    // Automatic Update Check (initial 6s delay, then every 24 hours)
+    setTimeout(() => {
+      if (autoUpdater && app.isPackaged) {
+        logBoot('Triggering automatic background update check');
+        autoUpdater.checkForUpdates().catch(e => logBoot('Background auto-update check error: ' + e.message));
+      }
+    }, 6000);
+
+    setInterval(() => {
+      if (autoUpdater && app.isPackaged) {
+        logBoot('Triggering periodic 24h background update check');
+        autoUpdater.checkForUpdates().catch(e => logBoot('Periodic auto-update check error: ' + e.message));
+      }
+    }, 24 * 60 * 60 * 1000);
   });
 
   mainWindow.on('closed', () => {

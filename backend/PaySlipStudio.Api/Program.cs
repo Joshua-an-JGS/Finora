@@ -134,6 +134,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<PayslipDocumentResolver>();

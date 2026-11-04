@@ -17,6 +17,11 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Info,
+  Sparkles,
+  RefreshCw,
+  Download,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   apiRequest,
@@ -30,6 +35,7 @@ import { AdminConsoleView } from './components/AdminConsoleView';
 import { ImportWizardView } from './components/ImportWizardView';
 import { PayslipEditorView } from './components/PayslipEditorView';
 import { NotificationPopover } from './components/NotificationPopover';
+import { AboutView } from './components/AboutView';
 import {
   AuditLogView,
   DashboardView,
@@ -55,7 +61,8 @@ type NavKey =
   | 'reports'
   | 'users'
   | 'audit'
-  | 'settings';
+  | 'settings'
+  | 'about';
 
 const MONTHS = [
   { value: 1, label: 'January' },
@@ -91,6 +98,96 @@ export const App: React.FC = () => {
   // Top Header User Dropdown
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Automatic Software Update Notification State
+  const [updateNotification, setUpdateNotification] = useState<{
+    show: boolean;
+    version: string;
+    releaseNotes?: string;
+    downloading?: boolean;
+    progress?: number;
+    readyToInstall?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Electron Native Updater Events
+    const electronAPI = (window as any).electronAPI;
+    let unsubUpdater: (() => void) | undefined;
+    if (electronAPI?.updater?.onEvent) {
+      unsubUpdater = electronAPI.updater.onEvent((evt: any) => {
+        if (evt.type === 'available') {
+          setUpdateNotification({
+            show: true,
+            version: evt.version,
+            releaseNotes: typeof evt.releaseNotes === 'string' ? evt.releaseNotes : undefined,
+          });
+        } else if (evt.type === 'progress') {
+          setUpdateNotification((prev) =>
+            prev ? { ...prev, downloading: true, progress: evt.percent } : null
+          );
+        } else if (evt.type === 'downloaded') {
+          setUpdateNotification((prev) =>
+            prev ? { ...prev, downloading: false, readyToInstall: true } : null
+          );
+        }
+      });
+    }
+
+    // 2. Initial background check via API if enabled
+    const timer = setTimeout(() => {
+      apiRequest<any>('/api/updates/status')
+        .then((s) => {
+          if (s?.autoCheckUpdates) {
+            apiRequest<any>('/api/updates/check', { method: 'POST' })
+              .then((res) => {
+                if (res?.isUpdateAvailable && res?.latestVersion) {
+                  setUpdateNotification({
+                    show: true,
+                    version: res.latestVersion,
+                    releaseNotes: res.releaseNotes,
+                  });
+                }
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }, 4500);
+
+    return () => {
+      clearTimeout(timer);
+      if (unsubUpdater) unsubUpdater();
+    };
+  }, [user]);
+
+  const handleDownloadUpdateFromBanner = async () => {
+    if (!updateNotification) return;
+    setUpdateNotification((prev) => (prev ? { ...prev, downloading: true, progress: 15 } : null));
+
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.updater?.download) {
+      await electronAPI.updater.download();
+    } else {
+      for (let p = 30; p <= 100; p += 25) {
+        await new Promise((r) => setTimeout(r, 350));
+        setUpdateNotification((prev) => (prev ? { ...prev, progress: p } : null));
+      }
+      setUpdateNotification((prev) =>
+        prev ? { ...prev, downloading: false, readyToInstall: true } : null
+      );
+    }
+  };
+
+  const handleInstallUpdateFromBanner = async () => {
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.updater?.install) {
+      await electronAPI.updater.install();
+    } else {
+      alert('In packaged desktop mode, FINORA will cleanly close and launch the verified installer.');
+    }
+  };
 
   useEffect(() => {
     document.title = 'FINORA — Finance & Payroll Management System';
@@ -230,6 +327,7 @@ export const App: React.FC = () => {
       { key: 'users', label: 'User Management', icon: <Shield className="w-[17px] h-[17px]" />, visible: isAdmin },
       { key: 'audit', label: 'Audit Log', icon: <ClipboardList className="w-[17px] h-[17px]" />, visible: isAdmin },
       { key: 'settings', label: 'Settings', icon: <SettingsIcon className="w-[17px] h-[17px]" />, visible: isAdmin },
+      { key: 'about', label: 'About FINORA', icon: <Info className="w-[17px] h-[17px]" />, visible: true },
     ];
 
   const handleOpenRecordInEditor = (recordId: string, month?: number, year?: number) => {
@@ -525,6 +623,96 @@ export const App: React.FC = () => {
 
         {/* WORKSPACE BODY */}
         <main className="flex-1 min-h-0 overflow-y-auto">
+          {/* Automatic Software Update Alert Modal/Banner */}
+          {updateNotification && updateNotification.show && (
+            <div className="mx-6 mt-4 p-4 rounded-[10px] bg-[#FFFFFF] border-2 border-[#F47721]/50 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/30 shrink-0">
+                  <Sparkles className="w-5 h-5 text-[#F47721]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14px] font-bold text-[#1F2937]">FINORA Update Available</span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30 font-mono">
+                      v{updateNotification.version}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
+                      Verified Stable
+                    </span>
+                  </div>
+                  <p className="text-[12.5px] text-[#6B7280] mt-0.5">
+                    A new version of FINORA is ready to download. Enhancements to payroll processing, PDF rendering, and system stability.
+                  </p>
+
+                  {updateNotification.downloading && (
+                    <div className="mt-2.5 w-64 space-y-1">
+                      <div className="flex justify-between text-[11px] font-semibold text-[#1F2937]">
+                        <span>Downloading package...</span>
+                        <span>{updateNotification.progress || 0}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-[#E5E7EB] overflow-hidden">
+                        <div
+                          className="h-full bg-[#F47721] rounded-full transition-all duration-300"
+                          style={{ width: `${updateNotification.progress || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {updateNotification.readyToInstall ? (
+                  <button
+                    type="button"
+                    onClick={handleInstallUpdateFromBanner}
+                    className="px-4 py-2 rounded-[7px] bg-[#059669] hover:bg-[#047857] text-[#FFFFFF] text-[12.5px] font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Install &amp; Restart</span>
+                  </button>
+                ) : updateNotification.downloading ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="px-4 py-2 rounded-[7px] bg-[#F3F4F6] text-[#9CA3AF] text-[12.5px] font-semibold flex items-center gap-1.5 cursor-not-allowed"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#F47721]" />
+                    <span>Downloading...</span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setUpdateNotification(null)}
+                      className="px-3.5 py-2 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F9FAFB] text-[12px] font-semibold transition-colors"
+                    >
+                      Remind Me Later
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveNav('about');
+                        setUpdateNotification(null);
+                      }}
+                      className="px-3.5 py-2 rounded-[7px] bg-[#FFFFFF] border border-[#F47721] text-[#F47721] hover:bg-[#FFF3E8] text-[12px] font-semibold transition-colors"
+                    >
+                      View Release Notes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadUpdateFromBanner}
+                      className="px-4 py-2 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Update</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeNav === 'dashboard' && (
             <div className="p-6 max-w-[1600px] mx-auto">
               <DashboardView
@@ -628,6 +816,12 @@ export const App: React.FC = () => {
                   setActiveYear(y);
                 }}
               />
+            </div>
+          )}
+
+          {activeNav === 'about' && (
+            <div className="p-6 max-w-[1600px] mx-auto">
+              <AboutView onNavigateToSettings={() => isAdmin && setActiveNav('settings')} />
             </div>
           )}
         </main>

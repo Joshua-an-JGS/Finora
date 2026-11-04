@@ -20,6 +20,13 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Joshua-an-JGS",
+        "repo": "Finora"
+      }
+    ],
     "files": [
       "electron/**/*",
       "build/icon.ico",
@@ -57,5 +64,8 @@
       "runAfterFinish": true,
       "artifactName": "FINORA Setup.${ext}"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }
