@@ -1,0 +1,52 @@
+# .NET & Build Outputs
+bin/
+obj/
+**/bin/
+**/obj/
+backend/dist-win-x64/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+.idea/
+
+# Electron & Release Packages (>100MB blocked by GitHub)
+release/
+dist/
+
+# Local PostgreSQL Cluster & Storage
+.pgdata/
+postgres.log
+backend/PaySlipStudio.Api/App_Data/
+backend/PaySlipStudio.Api/Storage/
+*.db
+*.db-shm
+*.db-wal
+
+# Node / Frontend / Dependencies
+node_modules/
+**/node_modules/
+frontend/dist/
+backend/PaySlipStudio.Api/wwwroot/assets/
+package-lock.json.bak
+
+# Secrets, Environment & Tokens
+.env
+.env.local
+.env.*.local
+token.txt
+*.token
+*.pem
+*.key
+*.pfx
+
+# Temporary & Test Files
+*.log
+*.tmp
+test_*.pdf
+~$*
+0.26.0
+0.30.0
+test_font.cs

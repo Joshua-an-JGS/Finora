@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FINORA Initialization</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+    body {
+      background: linear-gradient(135deg, #071747 0%, #0F172A 100%);
+      color: #FFFFFF;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 36px 40px;
+      overflow: hidden;
+      border: 1px solid rgba(244, 119, 33, 0.25);
+      border-radius: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo-badge {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #F47721 0%, #FF8A3D 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 20px rgba(244, 119, 33, 0.35);
+      font-size: 24px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: -1px;
+    }
+    .title-block h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #FFFFFF;
+    }
+    .title-block p {
+      font-size: 13px;
+      color: #94A3B8;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+    .stepper {
+      margin: 24px 0 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      color: #94A3B8;
+      transition: all 0.3s ease;
+    }
+    .step.active {
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+    .step.done {
+      color: #E2E8F0;
+    }
+    .step-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1.5px solid #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #64748B;
+      transition: all 0.3s ease;
+    }
+    .step.active .step-icon {
+      border-color: #F47721;
+      color: #F47721;
+      box-shadow: 0 0 10px rgba(244, 119, 33, 0.5);
+    }
+    .step.done .step-icon {
+      border-color: #10B981;
+      background: #10B981;
+      color: #FFFFFF;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 20%;
+      background: linear-gradient(90deg, #F47721, #FF8A3D);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #64748B;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .version-tag {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 3px 8px;
+      border-radius: 4px;
+      color: #94A3B8;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-badge">F</div>
+    <div class="title-block">
+      <h1>FINORA</h1>
+      <p>Finance &amp; Payroll Management System</p>
+    </div>
+  </div>
+
+  <div class="stepper">
+    <div class="step" id="step-db">
+      <div class="step-icon">○</div>
+      <span>Embedded Relational Database</span>
+    </div>
+    <div class="step" id="step-services">
+      <div class="step-icon">○</div>
+      <span>Core Payroll &amp; Application Services</span>
+    </div>
+    <div class="step" id="step-config">
+      <div class="step-icon">○</div>
+      <span>Configuration &amp; Security Vault</span>
+    </div>
+    <div class="step" id="step-doc">
+      <div class="step-icon">○</div>
+      <span>Document &amp; PDF Rendering Engine</span>
+    </div>
+  </div>
+
+  <div>
+    <div class="progress-bar-container">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div style="font-size: 11.5px; color: #94A3B8; margin-top: 8px; text-align: right;" id="statusText">
+      Initializing application...
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Designed and Developed by Joshua Godson</span>
+    <span class="version-tag">v1.0.0 Desktop Standalone</span>
+  </div>
+
+  <script>
+    const steps = [
+      { id: 'step-db', label: 'Embedded Relational Database', delay: 400 },
+      { id: 'step-services', label: 'Core Payroll & Application Services', delay: 900 },
+      { id: 'step-config', label: 'Configuration & Security Vault', delay: 1400 },
+      { id: 'step-doc', label: 'Document & PDF Rendering Engine', delay: 1900 }
+    ];
+
+    let current = 0;
+    const fill = document.getElementById('progressFill');
+    const statusText = document.getElementById('statusText');
+
+    function advanceStep(index) {
+      if (index >= steps.length) {
+        fill.style.width = '100%';
+        statusText.innerText = 'Ready — Launching FINORA';
+        return;
+      }
+      for (let i = 0; i < steps.length; i++) {
+        const el = document.getElementById(steps[i].id);
+        const icon = el.querySelector('.step-icon');
+        if (i < index) {
+          el.className = 'step done';
+          icon.innerHTML = '✓';
+        } else if (i === index) {
+          el.className = 'step active';
+          icon.innerHTML = '●';
+        } else {
+          el.className = 'step';
+          icon.innerHTML = '○';
+        }
+      }
+      fill.style.width = `${((index + 1) / steps.length) * 90}%`;
+      statusText.innerText = `Starting ${steps[index].label}...`;
+    }
+
+    advanceStep(0);
+    setTimeout(() => advanceStep(1), 700);
+    setTimeout(() => advanceStep(2), 1400);
+    setTimeout(() => advanceStep(3), 2100);
+
+    // Renderer will receive 'ready' event via IPC from main process
+    if (window.electronAPI && window.electronAPI.onReady) {
+      window.electronAPI.onReady(() => {
+        advanceStep(4);
+      });
+    }
+  </script>
+</body>
+</html>
+

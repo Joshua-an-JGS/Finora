@@ -1,0 +1,6 @@
+@PaySlipStudio.Api_HostAddress = http://localhost:5249
+
+GET {{PaySlipStudio.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

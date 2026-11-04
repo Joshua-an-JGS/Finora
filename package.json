@@ -1,0 +1,60 @@
+{
+  "name": "finora",
+  "version": "1.0.0",
+  "description": "FINORA — Finance & Payroll Management System",
+  "author": "Joshua Godson",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^35.7.5",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.finora.payroll",
+    "productName": "FINORA",
+    "copyright": "Copyright © 2026 FINORA. Designed and Developed by Joshua Godson.",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "build/icon.ico"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/dist-win-x64",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "sign": "./electron/sign.cjs"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FINORA",
+      "uninstallDisplayName": "FINORA Finance & Payroll Management System",
+      "runAfterFinish": true,
+      "artifactName": "FINORA Setup.${ext}"
+    }
+  }
+}

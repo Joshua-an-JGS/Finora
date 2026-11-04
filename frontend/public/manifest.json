@@ -1,0 +1,17 @@
+{
+  "name": "FINORA — Finance & Payroll Management System",
+  "short_name": "FINORA",
+  "description": "Enterprise Finance & Payroll Management System, Payslip Document Studio, and Delivery",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F8FA",
+  "theme_color": "#F47721",
+  "orientation": "landscape-primary",
+  "icons": [
+    {
+      "src": "/finora_logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ]
+}

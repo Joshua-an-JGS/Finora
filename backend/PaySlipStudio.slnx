@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PaySlipStudio.Api/PaySlipStudio.Api.csproj" />
+  <Project Path="PaySlipStudio.Tests/PaySlipStudio.Tests.csproj" />
+</Solution>
