@@ -531,6 +531,233 @@ public class AuthController : ControllerBase
         });
     }
 
+    public record UpdateProfileRequest(string FullName, string Email);
+    public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmNewPassword);
+
+    /// <summary>
+    /// Retrieves full profile details and recent account security activity for the current authenticated user.
+    /// Accessible by Administrator, Operator, and Viewer.
+    /// </summary>
+    [HttpGet("profile")]
+    [Authorize]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null || !user.IsActive) return Unauthorized();
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var primaryRole = roles.FirstOrDefault() ?? user.RoleName ?? AppRoles.Viewer;
+        var isAdminSession = User.HasClaim(c => c.Type == "PrivilegedAdminSession" && c.Value == "true");
+
+        // Fetch recent security activities for this user (up to 10 entries)
+        var recentActivities = await _db.AuditLogEntries
+            .AsNoTracking()
+            .Where(a => a.ActorUserId == user.Id || a.EntityId == user.Id || (a.ActorUserName == user.UserName && a.ActionType.StartsWith("Auth.")))
+            .OrderByDescending(a => a.TimestampUtc)
+            .Take(10)
+            .Select(a => new
+            {
+                action = a.ActionType,
+                summary = a.Summary,
+                timestamp = a.TimestampUtc,
+                ipAddress = a.IpAddress
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            id = user.Id,
+            userName = user.UserName,
+            email = user.Email,
+            fullName = user.FullName,
+            department = user.Department,
+            role = primaryRole,
+            isActive = user.IsActive,
+            createdAtUtc = user.CreatedAtUtc,
+            lastLoginAtUtc = user.LastLoginAtUtc,
+            mfaRequired = user.MfaRequired,
+            mfaConfigured = user.MfaConfigured,
+            isAdminSession = isAdminSession,
+            recentActivities
+        });
+    }
+
+    /// <summary>
+    /// Updates permitted personal details (full name and email) of the current authenticated user.
+    /// Accessible by Administrator, Operator, and Viewer.
+    /// </summary>
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest req)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null || !user.IsActive) return Unauthorized();
+
+        if (req == null || string.IsNullOrWhiteSpace(req.FullName) || string.IsNullOrWhiteSpace(req.Email))
+        {
+            return BadRequest(new { message = "Full name and email address are required." });
+        }
+
+        var cleanEmail = req.Email.Trim();
+        if (!cleanEmail.Contains('@') || !cleanEmail.Contains('.'))
+        {
+            return BadRequest(new { message = "Please enter a valid email address." });
+        }
+
+        // Email uniqueness check if email is being changed
+        if (!string.Equals(user.Email, cleanEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            var existingUser = await _userManager.FindByEmailAsync(cleanEmail);
+            if (existingUser != null && existingUser.Id != user.Id)
+            {
+                return BadRequest(new { message = $"Email address '{cleanEmail}' is already associated with another account." });
+            }
+            user.Email = cleanEmail;
+        }
+
+        user.FullName = req.FullName.Trim();
+
+        var updateRes = await _userManager.UpdateAsync(user);
+        if (!updateRes.Succeeded)
+        {
+            return BadRequest(new { message = string.Join("; ", updateRes.Errors.Select(e => e.Description)) });
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var primaryRole = roles.FirstOrDefault() ?? user.RoleName ?? AppRoles.Viewer;
+        var isAdminSession = User.HasClaim(c => c.Type == "PrivilegedAdminSession" && c.Value == "true");
+
+        await _audit.RecordAsync(
+            user.Id,
+            user.UserName ?? user.Email!,
+            primaryRole,
+            "Auth.ProfileUpdated",
+            "ApplicationUser",
+            user.Id,
+            $"User '{user.FullName}' ({primaryRole}) updated personal details: Name='{user.FullName}', Email='{user.Email}'.",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        var token = GenerateJwtToken(user, primaryRole, isAdminSession);
+
+        return Ok(new
+        {
+            token,
+            message = "Profile updated successfully.",
+            user = new
+            {
+                id = user.Id,
+                userName = user.UserName,
+                email = user.Email,
+                fullName = user.FullName,
+                department = user.Department,
+                role = primaryRole,
+                isActive = user.IsActive,
+                createdAtUtc = user.CreatedAtUtc,
+                lastLoginAtUtc = user.LastLoginAtUtc,
+                mfaRequired = user.MfaRequired,
+                mfaConfigured = user.MfaConfigured,
+                isAdminSession = isAdminSession
+            }
+        });
+    }
+
+    /// <summary>
+    /// Self-service password change for the current authenticated user.
+    /// Validates current password, enforces strength, rejects password reuse,
+    /// invalidates previous sessions via security stamp update, and logs to the audit trail.
+    /// Accessible by Administrator, Operator, and Viewer.
+    /// </summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest req)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null || !user.IsActive) return Unauthorized();
+
+        if (req == null ||
+            string.IsNullOrWhiteSpace(req.CurrentPassword) ||
+            string.IsNullOrWhiteSpace(req.NewPassword) ||
+            string.IsNullOrWhiteSpace(req.ConfirmNewPassword))
+        {
+            return BadRequest(new { message = "Current password, new password, and confirmation are required." });
+        }
+
+        if (req.NewPassword != req.ConfirmNewPassword)
+        {
+            return BadRequest(new { message = "New password and confirmation do not match." });
+        }
+
+        if (req.NewPassword.Length < 8)
+        {
+            return BadRequest(new { message = "New password must be at least 8 characters in length." });
+        }
+
+        if (string.Equals(req.CurrentPassword, req.NewPassword))
+        {
+            return BadRequest(new { message = "New password cannot be the same as your current password." });
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var primaryRole = roles.FirstOrDefault() ?? user.RoleName ?? AppRoles.Viewer;
+        var isAdminSession = User.HasClaim(c => c.Type == "PrivilegedAdminSession" && c.Value == "true");
+
+        // Verify current password
+        var checkPass = await _userManager.CheckPasswordAsync(user, req.CurrentPassword);
+        if (!checkPass)
+        {
+            await _audit.RecordAsync(
+                user.Id,
+                user.UserName ?? user.Email!,
+                primaryRole,
+                "Auth.PasswordChangeFailed",
+                "ApplicationUser",
+                user.Id,
+                $"Failed password change attempt for user '{user.FullName}' (incorrect current password).",
+                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            return BadRequest(new { message = "Current password is incorrect." });
+        }
+
+        // Execute password change
+        var changeRes = await _userManager.ChangePasswordAsync(user, req.CurrentPassword, req.NewPassword);
+        if (!changeRes.Succeeded)
+        {
+            var errors = string.Join("; ", changeRes.Errors.Select(e => e.Description));
+            return BadRequest(new { message = errors });
+        }
+
+        // Invalidate other sessions by updating security stamp
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        await _audit.RecordAsync(
+            user.Id,
+            user.UserName ?? user.Email!,
+            primaryRole,
+            "Auth.PasswordChanged",
+            "ApplicationUser",
+            user.Id,
+            $"User '{user.FullName}' ({primaryRole}) successfully changed their account password.",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        var token = GenerateJwtToken(user, primaryRole, isAdminSession);
+
+        return Ok(new
+        {
+            success = true,
+            token,
+            message = "Your password has been changed successfully."
+        });
+    }
+
     private string GenerateJwtToken(ApplicationUser user, string role, bool isAdminGateway = false)
     {
         var keyStr = _config["Jwt:SigningKey"] ?? "PaySlipStudio_Default_Enterprise_SigningKey_2026_Secure_32Bytes!";

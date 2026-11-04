@@ -49,6 +49,7 @@ import {
   SettingsView,
   UserManagementView,
 } from './components/ModuleViews';
+import { MyProfileView } from './components/MyProfileView';
 
 type NavKey =
   | 'dashboard'
@@ -63,7 +64,8 @@ type NavKey =
   | 'users'
   | 'audit'
   | 'settings'
-  | 'about';
+  | 'about'
+  | 'profile';
 
 const MONTHS = [
   { value: 1, label: 'January' },
@@ -302,6 +304,10 @@ export const App: React.FC = () => {
         currentUser={user}
         onReturnToFinora={() => setViewMode('workspace')}
         onLogout={handleLogout}
+        onOpenProfile={() => {
+          setViewMode('workspace');
+          setActiveNav('profile');
+        }}
         onActivePeriodUpdated={(m, y) => {
           setActiveMonth(m);
           setActiveYear(y);
@@ -589,6 +595,20 @@ export const App: React.FC = () => {
                     </div>
                     <div className="text-[11.5px] text-[#6B7280] truncate">{user.email}</div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      setViewMode('workspace');
+                      setActiveNav('profile');
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-[13px] text-[#1F2937] hover:bg-[#FFF3E8] hover:text-[#F47721] flex items-center gap-2 transition-colors font-medium cursor-pointer"
+                  >
+                    <User className="w-3.5 h-3.5 text-[#F47721]" />
+                    <span>My Profile</span>
+                  </button>
+
                   {isAdmin && (
                     <button
                       type="button"
@@ -596,16 +616,19 @@ export const App: React.FC = () => {
                         setShowUserMenu(false);
                         setViewMode('admin-console');
                       }}
-                      className="w-full text-left px-3.5 py-2 text-[13px] text-[#1F2937] hover:bg-[#FFF3E8] hover:text-[#F47721] flex items-center gap-2 transition-colors font-medium"
+                      className="w-full text-left px-3.5 py-2 text-[13px] text-[#1F2937] hover:bg-[#FFF3E8] hover:text-[#F47721] flex items-center gap-2 transition-colors font-medium cursor-pointer"
                     >
                       <Shield className="w-3.5 h-3.5 text-[#F47721]" />
                       <span>Administration Console</span>
                     </button>
                   )}
+
+                  <div className="my-1 border-t border-[#F3F4F6]"></div>
+
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-3.5 py-2 text-[13px] text-[#1F2937] hover:bg-[#FFF3E8] hover:text-[#F47721] flex items-center gap-2 transition-colors"
+                    className="w-full text-left px-3.5 py-2 text-[13px] text-[#1F2937] hover:bg-[#FFF3E8] hover:text-[#F47721] flex items-center gap-2 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Sign Out</span>
@@ -817,6 +840,20 @@ export const App: React.FC = () => {
           {activeNav === 'about' && (
             <div className="p-6 max-w-[1600px] mx-auto">
               <AboutView onNavigateToSettings={() => isAdmin && setActiveNav('settings')} />
+            </div>
+          )}
+
+          {activeNav === 'profile' && (
+            <div className="p-6 max-w-[1600px] mx-auto">
+              <MyProfileView
+                user={user}
+                onProfileUpdated={(updated) => setUser(updated)}
+                onNavigateToUserManagement={() => {
+                  if (isAdmin) {
+                    setViewMode('admin-console');
+                  }
+                }}
+              />
             </div>
           )}
         </main>

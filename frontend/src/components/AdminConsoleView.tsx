@@ -52,6 +52,7 @@ interface AdminConsoleViewProps {
   onReturnToFinora: () => void;
   onLogout: () => void;
   onActivePeriodUpdated?: (m: number, y: number) => void;
+  onOpenProfile?: () => void;
 }
 
 export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
@@ -59,6 +60,7 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
   onReturnToFinora,
   onLogout,
   onActivePeriodUpdated,
+  onOpenProfile,
 }) => {
   const [activeNav, setActiveNav] = useState<AdminNavKey>('dashboard');
   const [systemStats, setSystemStats] = useState<{
@@ -273,16 +275,23 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
             }}
           />
 
-          {/* Admin User Badge */}
-          <div className="hidden sm:flex items-center gap-2 px-1.5 py-1 select-none">
+          {/* Admin User Badge / Profile Link */}
+          <button
+            type="button"
+            onClick={onOpenProfile || onReturnToFinora}
+            className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-[6px] hover:bg-[#F3F4F6] transition-colors cursor-pointer select-none text-left"
+            title="View & Edit My Profile"
+          >
             <div className="w-7 h-7 rounded-full bg-[#F47721] text-[#FFFFFF] flex items-center justify-center shadow-xs shrink-0">
               <User className="w-3.5 h-3.5 text-[#FFFFFF]" />
             </div>
-            <div className="text-left leading-tight text-[12px]">
-              <div className="font-semibold text-[#1F2937]">{currentUser.fullName}</div>
-              <div className="text-[10.5px] text-[#F47721] font-medium">Administrator</div>
+            <div className="leading-tight text-[12px]">
+              <div className="font-semibold text-[#1F2937] hover:text-[#F47721] transition-colors">
+                {currentUser.fullName}
+              </div>
+              <div className="text-[10.5px] text-[#F47721] font-medium">Administrator &bull; My Profile</div>
             </div>
-          </div>
+          </button>
 
           {/* Secure Logout */}
           <button

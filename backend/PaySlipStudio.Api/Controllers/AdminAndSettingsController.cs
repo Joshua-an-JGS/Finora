@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -608,6 +609,55 @@ public class AdminAndSettingsController : ControllerBase
             userName = user.UserName,
             isActive = user.IsActive,
             message = user.IsActive ? "Member activated successfully." : "Member deactivated successfully."
+        });
+    }
+
+    public class AdminResetPasswordRequest
+    {
+        public string? CustomTemporaryPassword { get; set; }
+    }
+
+    [HttpPost("users/{id}/reset-password")]
+    [HttpPost("admin/users/{id}/reset-password")]
+    [Authorize(Roles = AppRoles.Administrator)]
+    public async Task<IActionResult> AdminResetPassword(string id, [FromBody] AdminResetPasswordRequest? req)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null) return NotFound(new { message = "User account not found." });
+
+        string newPassword;
+        if (!string.IsNullOrWhiteSpace(req?.CustomTemporaryPassword))
+        {
+            newPassword = req.CustomTemporaryPassword.Trim();
+            if (newPassword.Length < 8)
+                return BadRequest(new { message = "Temporary password must be at least 8 characters in length." });
+        }
+        else
+        {
+            var rawBytes = RandomNumberGenerator.GetBytes(6);
+            newPassword = "Finora#" + Convert.ToHexString(rawBytes).Substring(0, 6) + "!";
+        }
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var resetRes = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+        if (!resetRes.Succeeded)
+        {
+            return BadRequest(new { message = string.Join("; ", resetRes.Errors.Select(e => e.Description)) });
+        }
+
+        await _userManager.SetLockoutEndDateAsync(user, null);
+        await _userManager.ResetAccessFailedCountAsync(user);
+        await _userManager.UpdateSecurityStampAsync(user);
+
+        await _audit.RecordAsync(CurrentUserId, CurrentUserName, CurrentUserRole,
+            "User.PasswordResetByAdmin", "ApplicationUser", user.Id,
+            $"Administrator '{CurrentUserName}' initiated a password reset for user '{user.UserName}' ({user.Email}).");
+
+        return Ok(new
+        {
+            success = true,
+            temporaryPassword = newPassword,
+            message = $"Password for '{user.UserName}' has been reset successfully."
         });
     }
 

@@ -26,6 +26,7 @@ import {
   UserCheck,
   UserX,
   KeyRound,
+  Check,
   X,
 } from 'lucide-react';
 import { apiRequest, getAuthorizedDownloadUrl } from '../services/api';
@@ -1677,6 +1678,15 @@ export const UserManagementView: React.FC<{
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Administrative Reset Password State
+  const [resettingUser, setResettingUser] = useState<any | null>(null);
+  const [useAutoGenerate, setUseAutoGenerate] = useState(true);
+  const [customTempPassword, setCustomTempPassword] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [generatedTempPassword, setGeneratedTempPassword] = useState<string | null>(null);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+
   const loadUsers = () => {
     if (!isAdmin) return;
     setLoading(true);
@@ -1898,6 +1908,53 @@ export const UserManagementView: React.FC<{
       setDeleteError(err.message || 'Failed to delete member account.');
     } finally {
       setDeleteSubmitting(false);
+    }
+  };
+
+  const handleOpenResetPasswordModal = (u: any) => {
+    setActiveMenuUserId(null);
+    setResettingUser(u);
+    setUseAutoGenerate(true);
+    setCustomTempPassword('');
+    setResetError(null);
+    setGeneratedTempPassword(null);
+    setCopiedPassword(false);
+  };
+
+  const handleExecuteResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resettingUser) return;
+    setResetError(null);
+
+    if (!useAutoGenerate && (!customTempPassword || customTempPassword.trim().length < 8)) {
+      setResetError('Temporary password must be at least 8 characters in length.');
+      return;
+    }
+
+    setResetSubmitting(true);
+    try {
+      const res = await apiRequest<{ success: boolean; temporaryPassword: string; message: string }>(
+        `/api/admin/users/${resettingUser.id}/reset-password`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            customTemporaryPassword: useAutoGenerate ? null : customTempPassword.trim(),
+          }),
+        }
+      );
+
+      if (res && res.success) {
+        setGeneratedTempPassword(res.temporaryPassword);
+        setFeedback({
+          type: 'success',
+          message: `Password reset successfully for user '${resettingUser.userName}'.`,
+        });
+        loadUsers();
+      }
+    } catch (err: any) {
+      setResetError(err?.message || 'Failed to reset user password.');
+    } finally {
+      setResetSubmitting(false);
     }
   };
 
@@ -2149,6 +2206,15 @@ export const UserManagementView: React.FC<{
                             >
                               <Edit className="w-3.5 h-3.5" />
                               <span>Edit Member</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenResetPasswordModal(u)}
+                              className="w-full px-3.5 py-2 text-[#374151] hover:bg-[#FFF3E8] hover:text-[#F47721] flex items-center gap-2 font-medium transition-colors cursor-pointer"
+                            >
+                              <KeyRound className="w-3.5 h-3.5 text-[#F47721]" />
+                              <span>Reset Password</span>
                             </button>
 
                             <button
@@ -2668,6 +2734,199 @@ export const UserManagementView: React.FC<{
                 {deleteSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                 <span>Delete Member</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* 5. ADMINISTRATOR PASSWORD RESET MODAL                                */}
+      {/* ==================================================================== */}
+      {resettingUser && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#FFFFFF] rounded-[12px] border border-[#E5E7EB] shadow-2xl max-w-md w-full overflow-hidden text-[13px] animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-[#FFFFFF]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-[6px] bg-[#FFF3E8] text-[#F47721] flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-[#1F2937]">Reset User Password</h3>
+                  <p className="text-[11.5px] text-[#6B7280]">
+                    Administrative security credential override
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResettingUser(null)}
+                className="p-1 rounded-[6px] text-[#9CA3AF] hover:text-[#1F2937] hover:bg-[#F3F4F6]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              {/* User Identity Pill */}
+              <div className="p-3 bg-[#F9FAFB] rounded-[8px] border border-[#E5E7EB] flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-[#1F2937]">
+                    {resettingUser.fullName || resettingUser.userName}
+                  </div>
+                  <div className="text-[11.5px] text-[#6B7280]">
+                    @{resettingUser.userName} &bull; {resettingUser.email}
+                  </div>
+                </div>
+                <div className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FFF3E8] text-[#F47721] border border-[#FED7AA]">
+                  {resettingUser.role}
+                </div>
+              </div>
+
+              {resetError && (
+                <div className="p-2.5 rounded-[7px] bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] text-[12px] flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{resetError}</span>
+                </div>
+              )}
+
+              {!generatedTempPassword ? (
+                <form onSubmit={handleExecuteResetPassword} className="space-y-4">
+                  <div className="p-3 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[7px] text-[12px] text-[#1E40AF] leading-relaxed">
+                    Existing passwords are never revealed. Resetting this user&apos;s password will invalidate active sessions and assign a temporary password that requires the user to update it upon sign in.
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <label className="block text-[12px] font-semibold text-[#374151]">
+                      Temporary Password Mode:
+                    </label>
+
+                    <label className="flex items-start gap-2.5 p-2.5 border border-[#E5E7EB] rounded-[7px] hover:bg-[#F9FAFB] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="tempPassMode"
+                        checked={useAutoGenerate}
+                        onChange={() => setUseAutoGenerate(true)}
+                        className="mt-0.5 text-[#F47721] focus:ring-[#F47721]"
+                      />
+                      <div>
+                        <div className="font-medium text-[#1F2937] text-[12.5px]">
+                          Auto-generate secure temporary password (Recommended)
+                        </div>
+                        <div className="text-[11px] text-[#6B7280]">
+                          Generates a high-entropy 12-character alphanumeric code with symbols.
+                        </div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 p-2.5 border border-[#E5E7EB] rounded-[7px] hover:bg-[#F9FAFB] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="tempPassMode"
+                        checked={!useAutoGenerate}
+                        onChange={() => setUseAutoGenerate(false)}
+                        className="mt-0.5 text-[#F47721] focus:ring-[#F47721]"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-[#1F2937] text-[12.5px]">
+                          Specify custom temporary password
+                        </div>
+                        <div className="text-[11px] text-[#6B7280]">
+                          Must meet minimum 8 characters security policy.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {!useAutoGenerate && (
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#374151] mb-1">
+                        Custom Temporary Password:
+                      </label>
+                      <input
+                        type="text"
+                        value={customTempPassword}
+                        onChange={(e) => setCustomTempPassword(e.target.value)}
+                        placeholder="Enter temporary password (min 8 characters)"
+                        className="w-full px-3 py-2 text-[13px] border border-[#D1D5DB] rounded-[6px] focus:outline-hidden focus:border-[#F47721]"
+                      />
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-[#E5E7EB]">
+                    <button
+                      type="button"
+                      onClick={() => setResettingUser(null)}
+                      className="px-4 py-2 border border-[#D1D5DB] rounded-[7px] text-[#374151] hover:bg-[#FFFFFF] font-medium transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resetSubmitting}
+                      className="px-4 py-2 bg-[#F47721] hover:bg-[#E06411] text-[#FFFFFF] rounded-[7px] font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {resetSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                      <span>Reset Password</span>
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-3 bg-[#ECFDF5] border border-[#A7F3D0] rounded-[7px] flex items-center gap-2.5 text-[12.5px] text-[#065F46]">
+                    <CheckCircle2 className="w-4 h-4 text-[#059669] shrink-0" />
+                    <span>Password has been successfully reset!</span>
+                  </div>
+
+                  <div>
+                    <div className="text-[11.5px] font-semibold text-[#6B7280] mb-1.5">
+                      Temporary Account Password:
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 px-3.5 py-2.5 bg-[#F3F4F6] border border-[#D1D5DB] rounded-[6px] font-mono font-bold text-[14px] text-[#1F2937] tracking-wider select-all">
+                        {generatedTempPassword}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedTempPassword);
+                          setCopiedPassword(true);
+                          setTimeout(() => setCopiedPassword(false), 3000);
+                        }}
+                        className="px-3.5 py-2.5 bg-[#FFFFFF] border border-[#D1D5DB] hover:border-[#F47721] hover:text-[#F47721] text-[#374151] rounded-[6px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Copy to clipboard"
+                      >
+                        {copiedPassword ? (
+                          <>
+                            <Check className="w-4 h-4 text-[#10B981]" />
+                            <span className="text-[12px] text-[#10B981] font-semibold">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            <span className="text-[12px]">Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-[7px] text-[11.5px] text-[#92400E] leading-relaxed">
+                    <strong>Important Security Notice:</strong> Provide this temporary password securely to the user. For security reasons, this password will not be shown again.
+                  </div>
+
+                  <div className="pt-2 flex justify-end border-t border-[#E5E7EB]">
+                    <button
+                      type="button"
+                      onClick={() => setResettingUser(null)}
+                      className="px-5 py-2 bg-[#1F2937] hover:bg-[#374151] text-[#FFFFFF] rounded-[7px] font-medium text-[13px] transition-colors cursor-pointer"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
