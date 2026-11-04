@@ -392,9 +392,9 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
               <div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30">
+                <div className="text-[12px] font-bold text-[#F47721] tracking-wider uppercase">
                   Version 1.0.0
-                </span>
+                </div>
                 <h2 className="text-[18px] font-bold text-[#1F2937] mt-1">Initial Commercial Production Release</h2>
                 <div className="text-[12px] text-[#6B7280]">Released on November 4, 2026</div>
               </div>
@@ -442,22 +442,18 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
               Chronological log of verified releases and feature milestones for FINORA.
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-4 divide-y divide-[#E5E7EB]">
               {history.map((rel) => (
                 <div
                   key={rel.version}
-                  className="p-5 rounded-[9px] bg-[#F8F9FA] border border-[#E5E7EB] space-y-3"
+                  className="pt-4 first:pt-0 space-y-3"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] pb-2.5">
-                    <div className="flex items-center gap-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+                    <div className="flex items-center gap-2">
                       <span className="text-[16px] font-bold font-mono text-[#1F2937]">v{rel.version}</span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
-                        {rel.releaseType}
-                      </span>
+                      <span className="text-[12.5px] font-semibold text-[#059669]">· {rel.releaseType}</span>
                       {rel.isCurrent && (
-                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30">
-                          Current Installed Version
-                        </span>
+                        <span className="text-[12.5px] font-semibold text-[#F47721]">· Current Installed Version</span>
                       )}
                     </div>
                     <span className="text-[12px] text-[#6B7280]">{rel.releaseDate}</span>
@@ -494,7 +490,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
         <div className="space-y-6">
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm space-y-4">
             <h2 className="text-[16px] font-semibold text-[#1F2937]">Software License Agreement</h2>
-            <div className="p-4 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] text-[12.5px] text-[#4B5563] space-y-2 leading-relaxed">
+            <div className="text-[12.5px] text-[#4B5563] space-y-2 leading-relaxed">
               <p>
                 <strong>FINORA — Finance &amp; Payroll Management System</strong> is proprietary institutional software.
               </p>
@@ -513,7 +509,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
               FINORA is powered by open-source technologies and libraries:
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[12px]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-[12px]">
               {[
                 { name: '.NET 10.0 LTS & ASP.NET Core', license: 'MIT License', copyright: 'Microsoft Corporation' },
                 { name: 'React 19 & React DOM', license: 'MIT License', copyright: 'Meta Platforms, Inc.' },
@@ -524,12 +520,12 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
                 { name: 'Lucide Icons', license: 'ISC License', copyright: 'Lucide Contributors' },
                 { name: 'electron-updater', license: 'MIT License', copyright: 'electron-builder contributors' },
               ].map((lib) => (
-                <div key={lib.name} className="p-3 rounded-[7px] bg-[#F8F9FA] border border-[#E5E7EB] flex items-center justify-between">
+                <div key={lib.name} className="py-2.5 border-b border-[#F3F4F6] flex items-center justify-between">
                   <div>
                     <div className="font-semibold text-[#1F2937]">{lib.name}</div>
                     <div className="text-[11px] text-[#6B7280]">{lib.copyright}</div>
                   </div>
-                  <span className="px-2 py-0.5 rounded text-[10.5px] font-mono bg-[#FFFFFF] border border-[#E5E7EB] text-[#4B5563]">
+                  <span className="text-[11.5px] font-mono text-[#6B7280]">
                     {lib.license}
                   </span>
                 </div>
@@ -549,7 +545,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
                 Product development and software engineering
               </div>
             </div>
-            <div className="w-10 h-10 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/30 flex items-center justify-center text-[#F47721] font-bold font-mono">
+            <div className="text-[#F47721] font-bold font-mono text-[16px] tracking-wider">
               JG
             </div>
           </div>
