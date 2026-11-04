@@ -136,12 +136,6 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-[26px] font-bold text-[#1F2937] tracking-tight">FINORA</h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
-                  Installed Application
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30">
-                  v{updateStatus?.currentVersion || '1.0.0'}
-                </span>
               </div>
               <p className="text-[13px] font-medium text-[#6B7280] mt-0.5">
                 Finance &amp; Payroll Management System
