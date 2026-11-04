@@ -22,7 +22,8 @@
     },
     "files": [
       "electron/**/*",
-      "build/icon.ico"
+      "build/icon.ico",
+      "logo/**/*"
     ],
     "extraResources": [
       {

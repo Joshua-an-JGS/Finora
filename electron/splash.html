@@ -2,224 +2,246 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>FINORA Initialization</title>
+  <title>FINORA</title>
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-app-region: drag;
     }
-    body {
-      background: linear-gradient(135deg, #071747 0%, #0F172A 100%);
-      color: #FFFFFF;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 36px 40px;
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent;
       overflow: hidden;
-      border: 1px solid rgba(244, 119, 33, 0.25);
-      border-radius: 12px;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .logo-badge {
-      width: 48px;
-      height: 48px;
-      background: linear-gradient(135deg, #F47721 0%, #FF8A3D 100%);
-      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 8px 20px rgba(244, 119, 33, 0.35);
-      font-size: 24px;
-      font-weight: 800;
-      color: #FFFFFF;
-      letter-spacing: -1px;
     }
-    .title-block h1 {
-      font-size: 24px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      color: #FFFFFF;
-    }
-    .title-block p {
-      font-size: 13px;
-      color: #94A3B8;
-      margin-top: 2px;
-      font-weight: 500;
-    }
-    .stepper {
-      margin: 24px 0 16px 0;
+
+    /* Outer wrapper providing 10px margin for natural drop shadow on Windows */
+    .splash-container {
+      width: 500px;
+      height: 340px;
+      background: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 14px;
+      box-shadow: 0 16px 38px -8px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      justify-content: space-between;
+      overflow: hidden;
+      position: relative;
     }
-    .step {
+
+    /* Main central content */
+    .splash-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 32px 24px 32px;
+    }
+
+    /* Centered official FINORA logo */
+    .logo-wrapper {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 13px;
-      color: #94A3B8;
-      transition: all 0.3s ease;
+      justify-content: center;
+      margin-bottom: 34px;
+      pointer-events: none;
     }
-    .step.active {
-      color: #FFFFFF;
+
+    .logo-img {
+      width: 290px;
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      image-rendering: -webkit-optimize-contrast;
+    }
+
+    /* Progress and status section */
+    .loading-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .progress-track {
+      width: 260px;
+      height: 3.5px;
+      background: #E5E7EB;
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 15%;
+      background: linear-gradient(90deg, #F47721 0%, #FF8A3D 100%);
+      border-radius: 9999px;
+      transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+    }
+
+    .status-text {
+      margin-top: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #6B7280;
+      letter-spacing: 0.15px;
+      text-align: center;
+      transition: color 0.3s ease;
+      min-height: 18px;
+    }
+
+    .status-text.error {
+      color: #DC2626;
       font-weight: 600;
     }
-    .step.done {
-      color: #E2E8F0;
-    }
-    .step-icon {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      border: 1.5px solid #475569;
+
+    /* Bottom footer with subtle divider */
+    .splash-footer {
+      border-top: 1px solid #E5E7EB;
+      padding: 13px 26px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      color: #64748B;
-      transition: all 0.3s ease;
-    }
-    .step.active .step-icon {
-      border-color: #F47721;
-      color: #F47721;
-      box-shadow: 0 0 10px rgba(244, 119, 33, 0.5);
-    }
-    .step.done .step-icon {
-      border-color: #10B981;
-      background: #10B981;
-      color: #FFFFFF;
-    }
-    .progress-bar-container {
-      width: 100%;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-top: 10px;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      width: 20%;
-      background: linear-gradient(90deg, #F47721, #FF8A3D);
-      border-radius: 2px;
-      transition: width 0.4s ease;
-    }
-    .footer {
-      display: flex;
       justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      color: #64748B;
-      padding-top: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: #FFFFFF;
+      -webkit-app-region: no-drag;
     }
-    .version-tag {
-      background: rgba(255, 255, 255, 0.06);
-      padding: 3px 8px;
-      border-radius: 4px;
-      color: #94A3B8;
-      font-family: monospace;
+
+    .footer-credit {
+      font-size: 11.5px;
+      color: #6B7280;
+      font-weight: 500;
+      letter-spacing: 0.1px;
+    }
+
+    .footer-version {
+      font-size: 11.5px;
+      color: #6B7280;
+      font-weight: 600;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.2px;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo-badge">F</div>
-    <div class="title-block">
-      <h1>FINORA</h1>
-      <p>Finance &amp; Payroll Management System</p>
-    </div>
-  </div>
+  <div class="splash-container">
+    <div class="splash-body">
+      <!-- Centered Official FINORA Logo from project logo folder -->
+      <div class="logo-wrapper">
+        <img
+          class="logo-img"
+          src="../logo/splash%20logo.png"
+          alt="FINORA — Finance &amp; Payroll Management System"
+        />
+      </div>
 
-  <div class="stepper">
-    <div class="step" id="step-db">
-      <div class="step-icon">○</div>
-      <span>Embedded Relational Database</span>
+      <!-- Minimal slim loading progress bar & dynamic status -->
+      <div class="loading-section">
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="status-text" id="statusMessage">
+          Starting FINORA...
+        </div>
+      </div>
     </div>
-    <div class="step" id="step-services">
-      <div class="step-icon">○</div>
-      <span>Core Payroll &amp; Application Services</span>
-    </div>
-    <div class="step" id="step-config">
-      <div class="step-icon">○</div>
-      <span>Configuration &amp; Security Vault</span>
-    </div>
-    <div class="step" id="step-doc">
-      <div class="step-icon">○</div>
-      <span>Document &amp; PDF Rendering Engine</span>
-    </div>
-  </div>
 
-  <div>
-    <div class="progress-bar-container">
-      <div class="progress-bar-fill" id="progressFill"></div>
+    <!-- Bottom Footer: Designer Attribution & Dynamic Version -->
+    <div class="splash-footer">
+      <span class="footer-credit">Designed and Developed by Joshua Godson</span>
+      <span class="footer-version" id="versionText">v1.0.0</span>
     </div>
-    <div style="font-size: 11.5px; color: #94A3B8; margin-top: 8px; text-align: right;" id="statusText">
-      Initializing application...
-    </div>
-  </div>
-
-  <div class="footer">
-    <span>Designed and Developed by Joshua Godson</span>
-    <span class="version-tag">v1.0.0 Desktop Standalone</span>
   </div>
 
   <script>
-    const steps = [
-      { id: 'step-db', label: 'Embedded Relational Database', delay: 400 },
-      { id: 'step-services', label: 'Core Payroll & Application Services', delay: 900 },
-      { id: 'step-config', label: 'Configuration & Security Vault', delay: 1400 },
-      { id: 'step-doc', label: 'Document & PDF Rendering Engine', delay: 1900 }
-    ];
+    (function () {
+      // 1. Resolve Dynamic Version (Never hardcoded)
+      let resolvedVersion = null;
 
-    let current = 0;
-    const fill = document.getElementById('progressFill');
-    const statusText = document.getElementById('statusText');
-
-    function advanceStep(index) {
-      if (index >= steps.length) {
-        fill.style.width = '100%';
-        statusText.innerText = 'Ready — Launching FINORA';
-        return;
+      // Method A: Query Parameter (?v=1.0.0)
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryVer = urlParams.get('v');
+      if (queryVer) {
+        resolvedVersion = queryVer;
       }
-      for (let i = 0; i < steps.length; i++) {
-        const el = document.getElementById(steps[i].id);
-        const icon = el.querySelector('.step-icon');
-        if (i < index) {
-          el.className = 'step done';
-          icon.innerHTML = '✓';
-        } else if (i === index) {
-          el.className = 'step active';
-          icon.innerHTML = '●';
-        } else {
-          el.className = 'step';
-          icon.innerHTML = '○';
+
+      // Method B: IPC API from Electron Preload
+      if (!resolvedVersion && window.electronAPI && typeof window.electronAPI.getAppVersion === 'function') {
+        try {
+          const apiVer = window.electronAPI.getAppVersion();
+          if (apiVer) resolvedVersion = apiVer;
+        } catch (e) {
+          console.warn('Error reading app version via IPC:', e);
         }
       }
-      fill.style.width = `${((index + 1) / steps.length) * 90}%`;
-      statusText.innerText = `Starting ${steps[index].label}...`;
-    }
 
-    advanceStep(0);
-    setTimeout(() => advanceStep(1), 700);
-    setTimeout(() => advanceStep(2), 1400);
-    setTimeout(() => advanceStep(3), 2100);
+      // Format version as vX.Y.Z
+      const versionEl = document.getElementById('versionText');
+      if (resolvedVersion) {
+        const cleanVer = String(resolvedVersion).trim().replace(/^v/i, '');
+        versionEl.textContent = 'v' + cleanVer;
+      } else {
+        versionEl.textContent = 'v1.0.0';
+      }
 
-    // Renderer will receive 'ready' event via IPC from main process
-    if (window.electronAPI && window.electronAPI.onReady) {
-      window.electronAPI.onReady(() => {
-        advanceStep(4);
+      // 2. Loading Progress State Management
+      const fillEl = document.getElementById('progressFill');
+      const statusEl = document.getElementById('statusMessage');
+
+      const stages = [
+        { pct: 15, msg: 'Starting FINORA...', delay: 0 },
+        { pct: 45, msg: 'Preparing application...', delay: 450 },
+        { pct: 72, msg: 'Loading workspace...', delay: 1100 },
+        { pct: 88, msg: 'Loading workspace...', delay: 1800 }
+      ];
+
+      stages.forEach(stage => {
+        if (stage.delay === 0) {
+          fillEl.style.width = stage.pct + '%';
+          statusEl.textContent = stage.msg;
+        } else {
+          setTimeout(() => {
+            // Only update if not completed or errored
+            if (!fillEl.dataset.completed && !fillEl.dataset.errored) {
+              fillEl.style.width = stage.pct + '%';
+              statusEl.textContent = stage.msg;
+            }
+          }, stage.delay);
+        }
       });
-    }
+
+      // 3. Electron Backend Ready Event Listener
+      if (window.electronAPI && typeof window.electronAPI.onReady === 'function') {
+        window.electronAPI.onReady(() => {
+          fillEl.dataset.completed = 'true';
+          fillEl.style.width = '100%';
+          statusEl.textContent = 'Almost ready...';
+        });
+      }
+
+      // 4. Electron Initialization Error Listener
+      if (window.electronAPI && typeof window.electronAPI.onInitError === 'function') {
+        window.electronAPI.onInitError((errMsg) => {
+          fillEl.dataset.errored = 'true';
+          fillEl.style.background = '#DC2626';
+          fillEl.style.width = '100%';
+          statusEl.className = 'status-text error';
+          statusEl.textContent = 'Initialization failed. Check logs.';
+        });
+      }
+    })();
   </script>
 </body>
 </html>
-

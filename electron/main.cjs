@@ -158,12 +158,17 @@ function waitForBackend(port, timeoutMs = 30000) {
   });
 }
 
+// Handle dynamic version requests synchronously
+ipcMain.on('get-app-version-sync', (event) => {
+  event.returnValue = app.getVersion();
+});
+
 // 6. Create Splash Window
 function createSplashWindow() {
   const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
   splashWindow = new BrowserWindow({
     width: 520,
-    height: 380,
+    height: 360,
     frame: false,
     transparent: true,
     resizable: false,
@@ -177,7 +182,9 @@ function createSplashWindow() {
     }
   });
 
-  splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'), {
+    search: '?v=' + app.getVersion()
+  });
   splashWindow.once('ready-to-show', () => {
     splashWindow.show();
   });
@@ -278,13 +285,24 @@ app.whenReady().then(async () => {
     console.error('FINORA failed to initialize:', err);
     cleanupBackend();
     if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.close();
+      splashWindow.webContents.send('backend-error', err.message);
+      setTimeout(() => {
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.close();
+        }
+        dialog.showErrorBox(
+          'FINORA Startup Failure',
+          `Could not initialize FINORA application services.\n\nError: ${err.message}`
+        );
+        app.quit();
+      }, 2000);
+    } else {
+      dialog.showErrorBox(
+        'FINORA Startup Failure',
+        `Could not initialize FINORA application services.\n\nError: ${err.message}`
+      );
+      app.quit();
     }
-    dialog.showErrorBox(
-      'FINORA Startup Failure',
-      `Could not initialize FINORA application services.\n\nError: ${err.message}`
-    );
-    app.quit();
   }
 });
 
