@@ -567,7 +567,7 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowUserMenu((m) => !m)}
-                className="flex items-center gap-2.5 pl-2 pr-2.5 py-1.5 rounded-[8px] hover:bg-[#F8F9FA] border border-transparent hover:border-[#E5E7EB] transition-colors"
+                className="flex items-center gap-2.5 px-1.5 py-1 rounded-[8px] transition-colors cursor-pointer select-none focus:outline-hidden"
               >
                 <div className="w-8 h-8 rounded-full bg-[#F47721] flex items-center justify-center text-[#FFFFFF] shadow-xs shrink-0">
                   <User className="w-4 h-4 text-[#FFFFFF]" />

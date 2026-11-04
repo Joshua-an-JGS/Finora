@@ -274,7 +274,7 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
           />
 
           {/* Admin User Badge */}
-          <div className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-[8px] bg-[#FFFFFF] border border-[#E5E7EB]">
+          <div className="hidden sm:flex items-center gap-2 px-1.5 py-1 select-none">
             <div className="w-7 h-7 rounded-full bg-[#F47721] text-[#FFFFFF] flex items-center justify-center shadow-xs shrink-0">
               <User className="w-3.5 h-3.5 text-[#FFFFFF]" />
             </div>
@@ -288,7 +288,7 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
           <button
             type="button"
             onClick={onLogout}
-            className="p-2 rounded-[8px] border border-[#E5E7EB] bg-[#FFFFFF] text-[#6B7280] hover:text-[#EF4444] hover:border-[#EF4444]/40 hover:bg-[#FEF2F2] transition-colors"
+            className="p-1.5 text-[#6B7280] hover:text-[#EF4444] transition-colors focus:outline-hidden cursor-pointer"
             title="Sign Out of Administration"
           >
             <LogOut className="w-4 h-4" />
