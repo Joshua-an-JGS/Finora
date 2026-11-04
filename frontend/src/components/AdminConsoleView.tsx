@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Archive,
   FileText,
+  User,
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
 import type { UserProfile } from '../types/payroll';
@@ -274,8 +275,8 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
 
           {/* Admin User Badge */}
           <div className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-[8px] bg-[#FFFFFF] border border-[#E5E7EB]">
-            <div className="w-7 h-7 rounded-[6px] bg-[#1F2937] text-[#FFFFFF] font-bold text-[11px] flex items-center justify-center">
-              AD
+            <div className="w-7 h-7 rounded-full bg-[#F47721] text-[#FFFFFF] flex items-center justify-center shadow-xs shrink-0">
+              <User className="w-3.5 h-3.5 text-[#FFFFFF]" />
             </div>
             <div className="text-left leading-tight text-[12px]">
               <div className="font-semibold text-[#1F2937]">{currentUser.fullName}</div>

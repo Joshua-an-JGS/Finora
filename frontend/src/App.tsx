@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Download,
   CheckCircle2,
+  User,
 } from 'lucide-react';
 import {
   apiRequest,
@@ -341,12 +342,6 @@ export const App: React.FC = () => {
 
 
   const activeMonthLabel = MONTHS.find((m) => m.value === activeMonth)?.label || 'October';
-  const userInitials = (user.fullName || 'AU')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase())
-    .join('');
 
   return (
     <div className="min-h-screen flex bg-[#F8F9FA] text-[#1F2937]">
@@ -574,8 +569,8 @@ export const App: React.FC = () => {
                 onClick={() => setShowUserMenu((m) => !m)}
                 className="flex items-center gap-2.5 pl-2 pr-2.5 py-1.5 rounded-[8px] hover:bg-[#F8F9FA] border border-transparent hover:border-[#E5E7EB] transition-colors"
               >
-                <div className="w-8 h-8 rounded-[7px] bg-[#FFF3E8] border border-[#F47721]/25 flex items-center justify-center text-[#F47721] font-semibold text-[12px]">
-                  {userInitials}
+                <div className="w-8 h-8 rounded-full bg-[#F47721] flex items-center justify-center text-[#FFFFFF] shadow-xs shrink-0">
+                  <User className="w-4 h-4 text-[#FFFFFF]" />
                 </div>
                 <div className="text-left hidden sm:block leading-tight">
                   <div className="text-[13px] font-semibold text-[#1F2937]">
