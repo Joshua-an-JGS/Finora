@@ -228,52 +228,51 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
       {activeTab === 'overview' && (
         <div className="space-y-6">
           {/* About Narrative Card */}
-          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 space-y-4 shadow-sm">
-            <h2 className="text-[16px] font-semibold text-[#1F2937]">About the Software</h2>
-            <p className="text-[13px] text-[#4B5563] leading-relaxed">
-              <strong>FINORA</strong> is an institutional finance and payroll management desktop application engineered to streamline employee administration, monthly payroll processing, payslip generation, and fiscal reporting through a unified, high-security desktop platform. Built with dedicated dual-layout payslip engines and offline-first database clustering, FINORA guarantees continuous operation, cryptographic data integrity, and complete compliance.
-            </p>
+          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 space-y-5 shadow-sm">
+            <div>
+              <h2 className="text-[16px] font-semibold text-[#1F2937]">About the Software</h2>
+              <p className="text-[13px] text-[#4B5563] leading-relaxed mt-2">
+                <strong>FINORA</strong> is an institutional finance and payroll management desktop application engineered to streamline employee administration, monthly payroll processing, payslip generation, and fiscal reporting through a unified, high-security desktop platform. Built with dedicated dual-layout payslip engines and offline-first database clustering, FINORA guarantees continuous operation, cryptographic data integrity, and complete compliance.
+              </p>
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-              <div className="p-3.5 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB]">
-                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Application Version</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-[#F3F4F6]">
+              <div>
+                <div className="text-[11px] font-medium text-[#6B7280] uppercase tracking-wider">Application Version</div>
                 <div className="text-[15px] font-bold text-[#1F2937] mt-1 font-mono">v{updateStatus?.currentVersion || '1.0.0'}</div>
               </div>
-              <div className="p-3.5 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB]">
-                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Target Platform</div>
+              <div>
+                <div className="text-[11px] font-medium text-[#6B7280] uppercase tracking-wider">Target Platform</div>
                 <div className="text-[15px] font-bold text-[#1F2937] mt-1">Windows 64-bit</div>
               </div>
-              <div className="p-3.5 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB]">
-                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Update Channel</div>
+              <div>
+                <div className="text-[11px] font-medium text-[#6B7280] uppercase tracking-wider">Update Channel</div>
                 <div className="text-[15px] font-bold text-[#F47721] mt-1">Stable Production</div>
               </div>
-              <div className="p-3.5 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB]">
-                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Software License</div>
+              <div>
+                <div className="text-[11px] font-medium text-[#6B7280] uppercase tracking-wider">Software License</div>
                 <div className="text-[15px] font-bold text-[#1F2937] mt-1">Enterprise Standalone</div>
               </div>
             </div>
           </div>
 
           {/* Included Software Modules */}
-          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm">
-            <h2 className="text-[16px] font-semibold text-[#1F2937] mb-1">Included Software Modules</h2>
-            <p className="text-[12.5px] text-[#6B7280] mb-4">
-              FINORA provides an integrated suite of institutional modules for finance and payroll management:
-            </p>
+          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm space-y-4">
+            <div>
+              <h2 className="text-[16px] font-semibold text-[#1F2937]">Included Software Modules</h2>
+              <p className="text-[12.5px] text-[#6B7280] mt-0.5">
+                FINORA provides an integrated suite of institutional modules for finance and payroll management:
+              </p>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5 pt-1">
               {modules.map((m) => (
-                <div
-                  key={m.name}
-                  className="p-3.5 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] hover:border-[#F47721]/40 transition-colors"
-                >
+                <div key={m.name} className="space-y-1">
                   <div className="flex items-center gap-2 font-semibold text-[13.5px] text-[#1F2937]">
-                    <div className="p-1 rounded-[6px] bg-[#FFF3E8] border border-[#F47721]/20">
-                      {m.icon}
-                    </div>
+                    <span className="text-[#F47721] shrink-0">{m.icon}</span>
                     <span>{m.name}</span>
                   </div>
-                  <p className="text-[12px] text-[#6B7280] mt-2 leading-snug">
+                  <p className="text-[12px] text-[#6B7280] leading-relaxed pl-6">
                     {m.desc}
                   </p>
                 </div>
@@ -309,80 +308,81 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm space-y-5">
             <div>
               <h2 className="text-[16px] font-semibold text-[#1F2937]">System &amp; Environment Diagnostics</h2>
-              <p className="text-[12.5px] text-[#6B7280]">
+              <p className="text-[12.5px] text-[#6B7280] mt-0.5">
                 Technical environment metadata and storage paths for maintenance and support.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
-              <div className="p-4 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] space-y-3">
-                <div className="font-semibold text-[13.5px] text-[#1F2937] border-b border-[#E5E7EB] pb-2 flex items-center gap-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-6 text-[13px] pt-1">
+              <div className="space-y-3">
+                <div className="font-semibold text-[13.5px] text-[#1F2937] border-b border-[#E5E7EB] pb-2.5 flex items-center gap-2">
                   <Monitor className="w-4 h-4 text-[#F47721]" />
                   <span>Desktop Application Architecture</span>
                 </div>
                 <div className="space-y-2 text-[12.5px]">
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Installed Version:</span>
                     <span className="font-mono font-semibold text-[#1F2937]">v{systemInfo?.version || '1.0.0'}</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Build Identifier:</span>
                     <span className="font-mono text-[#1F2937]">{systemInfo?.buildNumber || '2026.11.04-prod.x64'}</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Release Date:</span>
                     <span className="text-[#1F2937]">{systemInfo?.releaseDate || 'November 4, 2026'}</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Target Platform:</span>
                     <span className="text-[#1F2937]">Windows Desktop 64-bit (win32-x64)</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Operating System:</span>
                     <span className="text-[#1F2937]">{systemInfo?.osVersion || 'Microsoft Windows 10/11'}</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Desktop Shell:</span>
                     <span className="text-[#1F2937]">Electron 35 / Chromium 134</span>
                   </div>
-                  <div className="flex justify-between py-1">
+                  <div className="flex justify-between py-1.5">
                     <span className="text-[#6B7280]">Frontend Framework:</span>
                     <span className="text-[#1F2937]">React 19 · TypeScript 5.8 · Tailwind CSS</span>
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB] space-y-3">
-                <div className="font-semibold text-[13.5px] text-[#1F2937] border-b border-[#E5E7EB] pb-2 flex items-center gap-2">
+              <div className="space-y-3">
+                <div className="font-semibold text-[13.5px] text-[#1F2937] border-b border-[#E5E7EB] pb-2.5 flex items-center gap-2">
                   <Database className="w-4 h-4 text-[#F47721]" />
                   <span>Backend Engine &amp; Storage Isolation</span>
                 </div>
                 <div className="space-y-2 text-[12.5px]">
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Backend Runtime:</span>
                     <span className="font-semibold text-[#1F2937]">.NET 10.0 LTS (Kestrel Web API)</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Database Engine:</span>
                     <span className="font-semibold text-[#1F2937]">PostgreSQL 18.0 (Embedded Cluster)</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Database Connectivity:</span>
-                    <span className="font-semibold text-[#059669] flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" /> Connected &amp; Healthy
+                    <span className="font-semibold text-[#059669] flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
+                      <span>Connected &amp; Healthy</span>
                     </span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Document Engine:</span>
                     <span className="text-[#1F2937]">QuestPDF 2025 High-Fidelity Engine</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-[#E5E7EB]/60">
+                  <div className="flex justify-between py-1.5 border-b border-[#F3F4F6]">
                     <span className="text-[#6B7280]">Persistent User Data:</span>
-                    <span className="font-mono text-[11px] text-[#1F2937] truncate max-w-[240px]">
+                    <span className="font-mono text-[11px] text-[#1F2937] truncate max-w-[240px]" title={systemInfo?.baseDataDirectory}>
                       {systemInfo?.baseDataDirectory || '%LOCALAPPDATA%\\FINORA'}
                     </span>
                   </div>
-                  <div className="flex justify-between py-1">
+                  <div className="flex justify-between py-1.5">
                     <span className="text-[#6B7280]">Data Safety:</span>
                     <span className="font-medium text-[#F47721]">Isolated from Application Binaries</span>
                   </div>
