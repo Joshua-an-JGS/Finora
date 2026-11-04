@@ -166,3 +166,35 @@ input[type="radio"] {
     display: none !important;
   }
 }
+
+/* ============================================================================
+   Notification Bell Orange Blink Animation
+   Blinks the entire bell icon in FINORA theme orange when unread items exist
+   ============================================================================ */
+@keyframes bellOrangeBlink {
+  0%, 100% {
+    color: #F47721;
+    opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(244, 119, 33, 0.5));
+  }
+  50% {
+    color: #F47721;
+    opacity: 0.2;
+    filter: none;
+  }
+}
+
+.bell-orange-blink {
+  animation: bellOrangeBlink 1s ease-in-out infinite;
+  transform-origin: center;
+  will-change: opacity, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bell-orange-blink {
+    animation: none !important;
+    opacity: 1 !important;
+    color: #F47721 !important;
+  }
+}
+

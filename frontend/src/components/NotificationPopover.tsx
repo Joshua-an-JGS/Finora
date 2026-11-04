@@ -228,27 +228,26 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
 
   return (
     <div className={`relative ${className}`} ref={popoverRef}>
-      {/* Bell Action Button */}
+      {/* Bell Action Button - Clean, frameless, no background box or border */}
       <button
         type="button"
         onClick={() => {
           setIsOpen((v) => !v);
           if (!isOpen) fetchNotifications();
         }}
-        className={`relative p-2 rounded-[8px] border transition-all ${
-          isOpen
-            ? 'border-[#F47721] bg-[#FFF8F3] text-[#F47721] shadow-xs'
-            : 'border-[#E5E7EB] bg-[#FFFFFF] text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F8F9FA]'
-        }`}
+        className="relative p-1.5 flex items-center justify-center text-[#6B7280] hover:text-[#1F2937] transition-colors focus:outline-hidden cursor-pointer"
         title={`Notifications (${unreadCount} unread)`}
         aria-label="Payroll Notifications"
       >
-        <Bell className="w-4 h-4" />
-
-        {/* Dynamic Unread Orange Dot / Counter */}
-        {unreadCount > 0 && (
-          <span className="w-2.5 h-2.5 rounded-full bg-[#F47721] absolute top-1 right-1 ring-2 ring-white animate-pulse" />
-        )}
+        <Bell
+          className={`w-5 h-5 transition-colors ${
+            unreadCount > 0
+              ? 'bell-orange-blink'
+              : isOpen
+                ? 'text-[#F47721]'
+                : 'text-[#6B7280] hover:text-[#1F2937]'
+          }`}
+        />
       </button>
 
       {/* Notifications Popover Dropdown */}
