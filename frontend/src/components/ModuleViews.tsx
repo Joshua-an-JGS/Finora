@@ -3045,8 +3045,8 @@ export const SettingsView: React.FC<{
     autoDownloadUpdates: false,
     notifyBeforeInstall: true,
     updateChannel: 'Stable',
-    currentVersion: '1.0.0',
-    availableVersion: '1.0.0',
+    currentVersion: '1.0.1',
+    availableVersion: '1.0.1',
     lastCheckedAtUtc: null,
     lastInstalledAtUtc: null,
   });
@@ -3087,7 +3087,7 @@ export const SettingsView: React.FC<{
         setUpdateMsg({ ok: true, text: `Update available: v${res.latestVersion}. Ready to download.`, available: true, newVersion: res.latestVersion });
       } else {
         setUpdateConfig((prev: any) => ({ ...prev, lastCheckedAtUtc: res.lastCheckedAtUtc }));
-        setUpdateMsg({ ok: true, text: 'FINORA is up to date. You are running the latest version (v1.0.0).' });
+        setUpdateMsg({ ok: true, text: `FINORA is up to date. You are running the latest version (v${res.currentVersion || '1.0.1'}).` });
       }
     } catch {
       setUpdateMsg({ ok: false, text: 'Unable to check for updates. Please check your internet connection and try again.' });
@@ -3729,7 +3729,7 @@ export const SettingsView: React.FC<{
             </div>
             <div className="p-3 rounded-[7px] bg-[#F9FAFB] border border-[#E5E7EB]">
               <div className="text-[#6B7280] text-[11px] font-medium uppercase tracking-wider">System Version</div>
-              <div className="text-[#1F2937] font-semibold text-[13px] mt-0.5">v1.0.0 Enterprise</div>
+              <div className="text-[#1F2937] font-semibold text-[13px] mt-0.5">v{updateConfig.currentVersion || '1.0.1'} Enterprise</div>
               <div className="text-[#6B7280] text-[11px] mt-0.5">.NET 10.0 Web API · React 19 · PostgreSQL</div>
             </div>
             <div className="p-3 rounded-[7px] bg-[#F9FAFB] border border-[#E5E7EB]">

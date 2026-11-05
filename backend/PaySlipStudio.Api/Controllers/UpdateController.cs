@@ -22,9 +22,9 @@ public class UpdateController : ControllerBase
     private readonly IConfiguration _config;
     private readonly AuditService _audit;
 
-    public const string CurrentApplicationVersion = "1.0.0";
-    public const string BuildIdentifier = "2026.11.04-prod.x64";
-    public const string ReleaseDateString = "November 4, 2026";
+    public const string CurrentApplicationVersion = "1.0.1";
+    public const string BuildIdentifier = "2026.11.05-prod.x64";
+    public const string ReleaseDateString = "November 5, 2026";
 
     public UpdateController(
         ApplicationDbContext db,
@@ -224,10 +224,36 @@ public class UpdateController : ControllerBase
         {
             new
             {
+                version = "1.0.1",
+                releaseDate = "November 5, 2026",
+                releaseType = "Feature & UI/UX Quality Update",
+                isCurrent = true,
+                summary = "FINORA System Quality Update: streamlined Payslip Editor template action bars, interactive preset naming prompt, and complete FINORA corporate theme harmonization.",
+                newFeatures = new[]
+                {
+                    "Interactive 'Save Template' dialog modal with instant name prompt and validation",
+                    "Harmonized system-theme 'Saved' status button adhering to FINORA brand standards",
+                    "Seamless preset naming with automated update and creation workflows"
+                },
+                improvements = new[]
+                {
+                    "Eliminated redundant and duplicated action button containers from Template & Layout view",
+                    "Updated clean template status indicator with signature FINORA accents",
+                    "Ensured consistent component height, spacing, and typography across all editor controls"
+                },
+                bugFixes = new[]
+                {
+                    "Resolved duplicate 'Template & Layout Actions' card cluttering the template editor",
+                    "Removed green color styling in favor of unified FINORA corporate design system",
+                    "Fixed character encoding artifacts in template preset selector"
+                }
+            },
+            new
+            {
                 version = "1.0.0",
                 releaseDate = "November 4, 2026",
                 releaseType = "Production Release",
-                isCurrent = true,
+                isCurrent = false,
                 summary = "Initial commercial production release of FINORA Finance & Payroll Management System.",
                 newFeatures = new[]
                 {
