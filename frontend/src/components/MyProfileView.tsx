@@ -13,9 +13,7 @@ import {
   Activity,
   Save,
   Check,
-  ShieldCheck,
   Building,
-  BadgeCheck,
 } from 'lucide-react';
 import type { UserProfile } from '../types/payroll';
 import { apiRequest, setStoredSession } from '../services/api';
@@ -284,16 +282,6 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
               <h1 className="text-[22px] font-bold text-[#1F2937] leading-tight">
                 {profile.fullName}
               </h1>
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold border ${roleMeta.bg}`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                {roleMeta.label}
-              </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
-                <BadgeCheck className="w-3 h-3" />
-                Active Account
-              </span>
             </div>
             <p className="text-[13px] text-[#6B7280] mt-1">
               Signed in as <span className="font-medium text-[#374151]">@{profile.userName}</span>{' '}
