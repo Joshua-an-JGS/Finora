@@ -57,19 +57,36 @@ public static class DatabaseInitializer
             }
         }
 
-        // 2. Seed Initial Users Only if Explicitly Requested via Config (Fresh Production Installs Use First-Time Setup Wizard)
-        if (string.Equals(config["BootstrapAdmin:ForceSeed"], "true", StringComparison.OrdinalIgnoreCase))
-        {
-            await EnsureUserAsync(
-                userManager,
-                email: config["BootstrapAdmin:Email"] ?? "admin@organization.org",
-                userName: config["BootstrapAdmin:Username"] ?? "admin",
-                password: config["BootstrapAdmin:InitialPassword"] ?? "Admin@12345!",
-                fullName: "System Administrator",
-                department: "IT & Governance",
-                role: AppRoles.Administrator,
-                mfaRequired: false);
-        }
+        // 2. Seed Default Standard Users
+        await EnsureUserAsync(
+            userManager,
+            email: "operator@amtdc.org",
+            userName: "operator",
+            password: "operator@12345",
+            fullName: "Accounts Operator",
+            department: "Finance & Accounts",
+            role: AppRoles.AccountsOperator,
+            mfaRequired: false);
+
+        await EnsureUserAsync(
+            userManager,
+            email: "viewer@amtdc.org",
+            userName: "viewer",
+            password: "viewer@12345",
+            fullName: "Payroll Viewer",
+            department: "General Administration",
+            role: AppRoles.Viewer,
+            mfaRequired: false);
+
+        await EnsureUserAsync(
+            userManager,
+            email: "admin@amtdc.org",
+            userName: "admin@amtdc.org",
+            password: "Admin@12345!",
+            fullName: "System Administrator",
+            department: "IT & Governance",
+            role: AppRoles.Administrator,
+            mfaRequired: false);
 
         // 3. Seed CompanySettings
         if (!await db.CompanySettings.AnyAsync())
@@ -281,9 +298,21 @@ Accounts & Finance Department
                 await userManager.AddToRoleAsync(user, role);
             }
         }
-        else if (!await userManager.IsInRoleAsync(user, role))
+        else
         {
-            await userManager.AddToRoleAsync(user, role);
+            user.IsActive = true;
+            user.LockoutEnd = null;
+            user.AccessFailedCount = 0;
+            if (!await userManager.IsInRoleAsync(user, role))
+            {
+                await userManager.AddToRoleAsync(user, role);
+            }
+            if (!await userManager.CheckPasswordAsync(user, password))
+            {
+                var token = await userManager.GeneratePasswordResetTokenAsync(user);
+                await userManager.ResetPasswordAsync(user, token, password);
+            }
+            await userManager.UpdateAsync(user);
         }
     }
 

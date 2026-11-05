@@ -412,36 +412,6 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
             </div>
           </div>
 
-          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm space-y-4">
-            <h2 className="text-[16px] font-semibold text-[#1F2937]">Open-Source Acknowledgements</h2>
-            <p className="text-[12.5px] text-[#6B7280]">
-              FINORA is powered by open-source technologies and libraries:
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-[12px]">
-              {[
-                { name: '.NET 10.0 LTS & ASP.NET Core', license: 'MIT License', copyright: 'Microsoft Corporation' },
-                { name: 'React 19 & React DOM', license: 'MIT License', copyright: 'Meta Platforms, Inc.' },
-                { name: 'Electron 35', license: 'MIT License', copyright: 'OpenJS Foundation' },
-                { name: 'Tailwind CSS', license: 'MIT License', copyright: 'Tailwind Labs, Inc.' },
-                { name: 'QuestPDF', license: 'Community License', copyright: 'QuestPDF Community' },
-                { name: 'PostgreSQL Database & Npgsql', license: 'PostgreSQL License', copyright: 'PostgreSQL Global Development Group' },
-                { name: 'Lucide Icons', license: 'ISC License', copyright: 'Lucide Contributors' },
-                { name: 'electron-updater', license: 'MIT License', copyright: 'electron-builder contributors' },
-              ].map((lib) => (
-                <div key={lib.name} className="py-2.5 border-b border-[#F3F4F6] flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-[#1F2937]">{lib.name}</div>
-                    <div className="text-[11px] text-[#6B7280]">{lib.copyright}</div>
-                  </div>
-                  <span className="text-[11.5px] font-mono text-[#6B7280]">
-                    {lib.license}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 shadow-sm flex items-center justify-between">
             <div>
               <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">
