@@ -15,7 +15,6 @@ import {
   Check,
   CheckCircle2,
   Key,
-  ShieldCheck,
 } from 'lucide-react';
 import { apiRequest, setStoredSession } from '../services/api';
 import type { UserProfile } from '../types/payroll';
@@ -37,10 +36,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Mode: 'normal' (Operator/Viewer) vs 'admin-gateway' (Protected Administrator Access)
   const [isAdminGateway, setIsAdminGateway] = useState(false);
 
-  // Normal Login Credentials (Administrator, Operator & Viewer) - Clean Empty Production Defaults
+  // Normal Login Credentials (Operator & Viewer ONLY) - Clean Empty Production Defaults
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRoleType, setSelectedRoleType] = useState<'administrator' | 'operator' | 'viewer'>('administrator');
+  const [selectedRoleType, setSelectedRoleType] = useState<'operator' | 'viewer'>('operator');
   const [normalMfaCode, setNormalMfaCode] = useState('');
   const [showMfaInput, setShowMfaInput] = useState(false);
 
@@ -225,7 +224,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const fillNormalRole = (role: 'administrator' | 'operator' | 'viewer') => {
+  const fillNormalRole = (role: 'operator' | 'viewer') => {
     setError(null);
     setSelectedRoleType(role);
   };
@@ -380,12 +379,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <strong>Important Security Notice:</strong> Store this Emergency Recovery Key in a secure offline location. If your administrator password or MFA access is ever lost, this cryptographic key is the only authorized method to recover your account.
                 </div>
 
+                <div className="p-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-[8px] text-[11.5px] text-[#4B5563] leading-relaxed">
+                  <strong>Admin Sign-In Shortcut:</strong> The Administrator Gateway is kept hidden from regular staff. On the sign-in screen, press <kbd className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-[#FFFFFF] border border-[#D1D5DB] rounded-[4px] shadow-2xs">Ctrl + Shift + Alt + A</kbd> to open the gateway.
+                </div>
+
                 <button
                   type="button"
                   onClick={() => {
                     setSetupSuccessRecoveryKey(null);
                     setIsFirstRunSetup(false);
-                    setInfoMessage('Administrator account created successfully! Please sign in with your credentials to begin.');
+                    setIsAdminGateway(false);
+                    setInfoMessage('Administrator account created successfully! Press Ctrl+Shift+Alt+A to access the Admin Gateway.');
                   }}
                   className="w-full mt-2 py-2.5 px-4 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
                 >
@@ -589,28 +593,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
             </div>
 
-            {/* Role Selection Tabs */}
+            {/* Role Selection Tabs for Everyday Users (Operator / Viewer) */}
             <div className="mb-5 space-y-1.5">
               <label className="block text-[11.5px] font-bold text-[#6B7280] uppercase tracking-wider">
                 Sign in as
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillNormalRole('administrator')}
-                  className={`py-2 px-2 rounded-[7px] text-[12.5px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
-                    selectedRoleType === 'administrator'
-                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
-                      : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Admin</span>
-                </button>
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
                   onClick={() => fillNormalRole('operator')}
-                  className={`py-2 px-2 rounded-[7px] text-[12.5px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'operator'
                       ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
                       : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
@@ -622,13 +614,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={() => fillNormalRole('viewer')}
-                  className={`py-2 px-2 rounded-[7px] text-[12.5px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'viewer'
                       ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
                       : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
                   }`}
                 >
-                  <UserCheck className="w-3.5 h-3.5" />
+                  <User className="w-3.5 h-3.5" />
                   <span>Viewer</span>
                 </button>
               </div>

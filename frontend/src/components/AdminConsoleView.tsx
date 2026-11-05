@@ -237,14 +237,9 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
               className="w-[38px] h-[38px] rounded-[7px] object-contain shrink-0"
             />
             <div className="leading-tight">
-              <div className="flex items-center gap-2">
-                <span className="text-[17px] font-bold text-[#1F2937] tracking-tight">
-                  FINORA Administration
-                </span>
-                <span className="px-2 py-0.5 rounded-[4px] bg-[#1F2937] text-[#FFFFFF] text-[10.5px] font-bold uppercase tracking-wider">
-                  Admin Gateway
-                </span>
-              </div>
+              <span className="text-[17px] font-bold text-[#1F2937] tracking-tight">
+                FINORA Administration
+              </span>
               <div className="text-[11px] text-[#6B7280]">
                 Restricted System Administration Console
               </div>
