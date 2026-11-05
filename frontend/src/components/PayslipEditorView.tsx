@@ -1806,7 +1806,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                 className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-[7px] text-[13px] transition-all cursor-pointer ${
                   dirty
                     ? 'bg-[#F47721] text-[#FFFFFF] hover:bg-[#E06612] font-semibold shadow-xs ring-2 ring-[#F47721]/30 animate-pulse'
-                    : 'bg-[#F9FAFB] text-[#10B981] border border-[#D1D5DB] font-medium cursor-default opacity-90'
+                    : 'bg-[#FFFFFF] text-[#1F2937] border border-[#E5E7EB] font-medium shadow-2xs hover:border-[#D1D5DB] cursor-default'
                 }`}
                 title={dirty ? 'Save changes made to this employee payslip' : 'All changes saved to database'}
               >
@@ -1822,8 +1822,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                    <span>Saved</span>
+                    <CheckCircle2 className="w-4 h-4 text-[#F47721]" />
+                    <span className="font-semibold text-[#1F2937]">Saved</span>
                   </>
                 )}
               </button>
@@ -4969,7 +4969,11 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   {/* Template Status Bar */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-3.5 flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${dirty ? 'bg-[#F47721] animate-pulse' : 'bg-[#10B981]'}`} />
+                      {dirty ? (
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#F47721] animate-pulse" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 text-[#F47721]" />
+                      )}
                       <span className="text-[12.5px] font-medium text-[#1F2937]">
                         {dirty ? 'Unsaved template styling changes' : 'All template changes saved'}
                       </span>
