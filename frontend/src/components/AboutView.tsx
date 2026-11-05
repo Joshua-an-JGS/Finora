@@ -86,7 +86,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
         });
       } else {
         setCheckResult({
-          message: `FINORA is up to date. You are running the latest version (v${res.currentVersion || updateStatus?.currentVersion || '1.0.1'}).`,
+          message: `FINORA is up to date. You are running the latest version (v${res.currentVersion || updateStatus?.currentVersion || '1.0.2'}).`,
           isError: false
         });
       }
@@ -232,7 +232,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-[#F3F4F6]">
               <div>
                 <div className="text-[11px] font-medium text-[#6B7280] uppercase tracking-wider">Application Version</div>
-                <div className="text-[15px] font-bold text-[#1F2937] mt-1 font-mono">v{updateStatus?.currentVersion || '1.0.1'}</div>
+                <div className="text-[15px] font-bold text-[#1F2937] mt-1 font-mono">v{updateStatus?.currentVersion || '1.0.2'}</div>
               </div>
               <div>
                 <div className="text-[11px] font-medium text-[#6B7280] uppercase tracking-wider">Target Platform</div>
@@ -302,7 +302,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
             <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
               <div>
                 <div className="text-[12px] font-bold text-[#F47721] tracking-wider uppercase">
-                  Version 1.0.1
+                  Version 1.0.2
                 </div>
                 <h2 className="text-[18px] font-bold text-[#1F2937] mt-1">Feature &amp; UI/UX Quality Update</h2>
                 <div className="text-[12px] text-[#6B7280]">Released on November 5, 2026</div>

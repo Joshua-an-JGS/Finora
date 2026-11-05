@@ -1,6 +1,6 @@
 {
   "name": "finora",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "FINORA — Finance & Payroll Management System",
   "author": "Joshua Godson",
   "main": "electron/main.cjs",

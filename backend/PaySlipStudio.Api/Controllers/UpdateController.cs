@@ -22,7 +22,7 @@ public class UpdateController : ControllerBase
     private readonly IConfiguration _config;
     private readonly AuditService _audit;
 
-    public const string CurrentApplicationVersion = "1.0.1";
+    public const string CurrentApplicationVersion = "1.0.2";
     public const string BuildIdentifier = "2026.11.05-prod.x64";
     public const string ReleaseDateString = "November 5, 2026";
 
@@ -224,10 +224,36 @@ public class UpdateController : ControllerBase
         {
             new
             {
+                version = "1.0.2",
+                releaseDate = "November 5, 2026",
+                releaseType = "Maintenance & Enhancements Update",
+                isCurrent = true,
+                summary = "FINORA System Update: Payslip deductions table formatting optimization, dedicated contact phone field, and interactive company website hyperlinks.",
+                newFeatures = new[]
+                {
+                    "Dedicated Contact / Phone Number input field in Company Header settings",
+                    "Interactive clickable Hyperlink support for Company Website URL in payslip paper and PDF export",
+                    "Adaptive column width ratio controls for Particulars and Amount columns"
+                },
+                improvements = new[]
+                {
+                    "Eliminated empty ghost rows in Deductions & Recoveries table for clean compact presentation",
+                    "Dynamic table row height balancing between Earnings and Deductions tables",
+                    "Seamless contact information display allowing simultaneous email, phone, and web link presentation"
+                },
+                bugFixes = new[]
+                {
+                    "Fixed empty row padding appearing at the bottom of the Deductions table",
+                    "Fixed phone number display suppression when email address was present in header",
+                    "Fixed column label width proportion clamping across standard and widescreen displays"
+                }
+            },
+            new
+            {
                 version = "1.0.1",
                 releaseDate = "November 5, 2026",
                 releaseType = "Feature & UI/UX Quality Update",
-                isCurrent = true,
+                isCurrent = false,
                 summary = "FINORA System Quality Update: streamlined Payslip Editor template action bars, interactive preset naming prompt, and complete FINORA corporate theme harmonization.",
                 newFeatures = new[]
                 {
