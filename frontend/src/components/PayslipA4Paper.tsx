@@ -129,19 +129,55 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
   };
   // Section 16: Organization Header + Orange Divider Line
   const renderHeader = () => {
-    const contactStr = cfg.showCompanyContact
-      ? doc.companyContactEmail || doc.companyEmail || ''
+    const emailStr = cfg.showCompanyContact
+      ? (doc.companyContactEmail || doc.companyEmail || '').trim()
       : '';
-    const phoneStr =
-      cfg.showCompanyContact && !doc.companyContactEmail
-        ? doc.companyContactPhone || doc.companyPhone || ''
-        : '';
-    const webStr = cfg.showCompanyWebsite ? doc.companyWebsite || '' : '';
-    const contactParts = [
-      contactStr,
-      phoneStr && !contactStr.includes(phoneStr) ? phoneStr : '',
-      webStr && !contactStr.includes(webStr) ? webStr : '',
-    ].filter((x) => x && x.trim().length > 0);
+    const phoneStr = cfg.showCompanyContact
+      ? (doc.companyContactPhone || doc.companyPhone || '').trim()
+      : '';
+    const webStr = cfg.showCompanyWebsite ? (doc.companyWebsite || '').trim() : '';
+
+    interface ContactItem {
+      type: 'email' | 'phone' | 'website';
+      text: string;
+      href?: string;
+    }
+
+    const contactItems: ContactItem[] = [];
+    if (emailStr) {
+      contactItems.push({ type: 'email', text: emailStr, href: `mailto:${emailStr}` });
+    }
+    if (phoneStr && !emailStr.includes(phoneStr)) {
+      const displayPhone = phoneStr.startsWith('Ph:') || phoneStr.startsWith('Tel:') ? phoneStr : `Ph: ${phoneStr}`;
+      contactItems.push({ type: 'phone', text: displayPhone, href: `tel:${phoneStr.replace(/[^0-9+]/g, '')}` });
+    }
+    if (webStr && !emailStr.includes(webStr)) {
+      const fullUrl = webStr.startsWith('http://') || webStr.startsWith('https://') ? webStr : `https://${webStr}`;
+      contactItems.push({ type: 'website', text: webStr, href: fullUrl });
+    }
+
+    const renderContactItem = (item: ContactItem) => {
+      if (item.type === 'website' && item.href) {
+        return (
+          <a
+            href={item.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline font-medium inline-block whitespace-nowrap cursor-pointer transition-colors"
+            style={{ color: orange }}
+            onClick={(e) => {
+              if ((window as any).electronAPI?.openExternal) {
+                e.preventDefault();
+                (window as any).electronAPI.openExternal(item.href);
+              }
+            }}
+          >
+            {item.text}
+          </a>
+        );
+      }
+      return <span className="inline-block whitespace-nowrap">{item.text.replace(/-/g, '\u2011')}</span>;
+    };
     return (
       <div key="Header" style={{ marginBottom: `${sectionGapPx * 0.75}px` }}>
         {cfg.headerAlignment === 'Center' ? (
@@ -174,12 +210,12 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
                 {doc.companyAddress}
               </div>
             )}
-            {contactParts.length > 0 && (
+            {contactItems.length > 0 && (
               <div style={{ color: textSecondary, fontSize: `${baseFontPt - 1}pt`, marginTop: '2px' }}>
-                {contactParts.map((part, i) => (
+                {contactItems.map((item, i) => (
                   <React.Fragment key={i}>
                     {i > 0 && <span>  ·  </span>}
-                    <span className="inline-block whitespace-nowrap">{part.replace(/-/g, '\u2011')}</span>
+                    {renderContactItem(item)}
                   </React.Fragment>
                 ))}
               </div>
@@ -225,35 +261,35 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
                   {doc.companyAddress}
                 </div>
               )}
-              {contactParts.length > 0 && (
+              {contactItems.length > 0 && (
                 <div
                   className="flex flex-col items-end gap-0.5"
                   style={{ color: textSecondary, fontSize: `${baseFontPt - 1.5}pt`, marginTop: '3px', lineHeight: 1.4 }}
                 >
-                  {contactParts.length <= 2 ? (
+                  {contactItems.length <= 2 ? (
                     <div>
-                      {contactParts.map((part, i) => (
+                      {contactItems.map((item, i) => (
                         <React.Fragment key={i}>
                           {i > 0 && <span className="text-gray-400">  ·  </span>}
-                          <span className="inline-block whitespace-nowrap">{part}</span>
+                          {renderContactItem(item)}
                         </React.Fragment>
                       ))}
                     </div>
                   ) : (
                     <>
                       <div>
-                        {contactParts.slice(0, 2).map((part, i) => (
+                        {contactItems.slice(0, 2).map((item, i) => (
                           <React.Fragment key={i}>
                             {i > 0 && <span className="text-gray-400">  ·  </span>}
-                            <span className="inline-block whitespace-nowrap">{part}</span>
+                            {renderContactItem(item)}
                           </React.Fragment>
                         ))}
                       </div>
                       <div>
-                        {contactParts.slice(2).map((part, i) => (
+                        {contactItems.slice(2).map((item, i) => (
                           <React.Fragment key={i}>
                             {i > 0 && <span className="text-gray-400">  ·  </span>}
-                            <span className="inline-block whitespace-nowrap">{part}</span>
+                            {renderContactItem(item)}
                           </React.Fragment>
                         ))}
                       </div>
@@ -294,12 +330,12 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
                   {doc.companyAddress}
                 </div>
               )}
-              {contactParts.length > 0 && (
+              {contactItems.length > 0 && (
                 <div style={{ color: textSecondary, fontSize: `${baseFontPt - 1}pt`, marginTop: '2px' }}>
-                  {contactParts.map((part, i) => (
+                  {contactItems.map((item, i) => (
                     <React.Fragment key={i}>
                       {i > 0 && <span>  ·  </span>}
-                      <span className="inline-block whitespace-nowrap">{part.replace(/-/g, '\u2011')}</span>
+                      {renderContactItem(item)}
                     </React.Fragment>
                   ))}
                 </div>

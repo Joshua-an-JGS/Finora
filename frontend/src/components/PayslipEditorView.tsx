@@ -3202,24 +3202,46 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                             />
                           </div>
 
-                          <div>
-                            <label className="block text-[11.5px] font-medium text-[#1F2937] mb-1">
-                              Contact Information (Email / Phone)
-                            </label>
-                            <input
-                              type="text"
-                              placeholder={serverDoc?.companyEmail || 'accounts@company.org'}
-                              value={
-                                styleEdit.overrideCompanyContact !== undefined && styleEdit.overrideCompanyContact !== null
-                                  ? styleEdit.overrideCompanyContact
-                                  : serverDoc?.companyEmail || ''
-                              }
-                              onChange={(e) => {
-                                setDirty(true);
-                                setStyleEdit({ ...styleEdit, overrideCompanyContact: e.target.value });
-                              }}
-                              className="w-full px-3 py-1.5 text-[13px] border border-[#E5E7EB] rounded-[7px] text-[#1F2937] focus:border-[#F47721] focus:outline-hidden"
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11.5px] font-medium text-[#1F2937] mb-1">
+                                Official Email Address
+                              </label>
+                              <input
+                                type="text"
+                                placeholder={serverDoc?.companyEmail || 'accounts@company.org'}
+                                value={
+                                  styleEdit.overrideCompanyContact !== undefined && styleEdit.overrideCompanyContact !== null
+                                    ? styleEdit.overrideCompanyContact
+                                    : serverDoc?.companyEmail || ''
+                                }
+                                onChange={(e) => {
+                                  setDirty(true);
+                                  setStyleEdit({ ...styleEdit, overrideCompanyContact: e.target.value });
+                                }}
+                                className="w-full px-3 py-1.5 text-[13px] border border-[#E5E7EB] rounded-[7px] text-[#1F2937] focus:border-[#F47721] focus:outline-hidden"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11.5px] font-medium text-[#1F2937] mb-1">
+                                Contact / Phone Number
+                              </label>
+                              <input
+                                type="text"
+                                placeholder={serverDoc?.companyPhone || '+91 044-6646 9825'}
+                                value={
+                                  styleEdit.overrideCompanyPhone !== undefined && styleEdit.overrideCompanyPhone !== null
+                                    ? styleEdit.overrideCompanyPhone
+                                    : serverDoc?.companyPhone || ''
+                                }
+                                onChange={(e) => {
+                                  setDirty(true);
+                                  setStyleEdit({ ...styleEdit, overrideCompanyPhone: e.target.value });
+                                }}
+                                className="w-full px-3 py-1.5 text-[13px] border border-[#E5E7EB] rounded-[7px] text-[#1F2937] focus:border-[#F47721] focus:outline-hidden"
+                              />
+                            </div>
                           </div>
 
                           <div>

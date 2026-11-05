@@ -376,35 +376,39 @@ public class PdfRenderingService
                                 .FontSize(baseFontPt - 1.5f)
                                 .FontColor(textSecondaryHex);
                         }
-                        var contactParts = new List<string>();
-                        if (cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyEmail))
-                            contactParts.Add(model.CompanyEmail.Trim());
-                        if (cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyPhone) &&
-                            (string.IsNullOrWhiteSpace(model.CompanyEmail) || !model.CompanyEmail.Contains(model.CompanyPhone.Trim(), StringComparison.OrdinalIgnoreCase)))
-                            contactParts.Add(model.CompanyPhone.Trim());
-                        if (cfg.ShowCompanyWebsite && !string.IsNullOrWhiteSpace(model.CompanyWebsite) &&
-                            (string.IsNullOrWhiteSpace(model.CompanyEmail) || !model.CompanyEmail.Contains(model.CompanyWebsite.Trim(), StringComparison.OrdinalIgnoreCase)))
-                            contactParts.Add(model.CompanyWebsite.Trim());
-                        if (contactParts.Count > 0)
+                        bool hasEmail = cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyEmail);
+                        bool hasPhone = cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyPhone);
+                        bool hasWeb = cfg.ShowCompanyWebsite && !string.IsNullOrWhiteSpace(model.CompanyWebsite);
+
+                        if (hasEmail || hasPhone || hasWeb)
                         {
-                            if (contactParts.Count <= 2)
+                            rightCol.Item().AlignRight().PaddingTop(2).Text(t =>
                             {
-                                string safeContact = string.Join("  ·  ", contactParts);
-                                rightCol.Item().AlignRight().PaddingTop(2).Text(safeContact)
-                                    .FontSize(baseFontPt - 1.5f)
-                                    .FontColor(textSecondaryHex);
-                            }
-                            else
-                            {
-                                string line1 = string.Join("  ·  ", contactParts.Take(2));
-                                string line2 = string.Join("  ·  ", contactParts.Skip(2));
-                                rightCol.Item().AlignRight().PaddingTop(2).Text(line1)
-                                    .FontSize(baseFontPt - 1.5f)
-                                    .FontColor(textSecondaryHex);
-                                rightCol.Item().AlignRight().PaddingTop(1).Text(line2)
-                                    .FontSize(baseFontPt - 1.5f)
-                                    .FontColor(textSecondaryHex);
-                            }
+                                t.DefaultTextStyle(x => x.FontSize(baseFontPt - 1.5f).FontColor(textSecondaryHex));
+                                bool needSep = false;
+                                if (hasEmail)
+                                {
+                                    t.Span(model.CompanyEmail.Trim());
+                                    needSep = true;
+                                }
+                                if (hasPhone)
+                                {
+                                    if (needSep) t.Span("  ·  ");
+                                    string phone = model.CompanyPhone.Trim();
+                                    if (!phone.StartsWith("Ph:", StringComparison.OrdinalIgnoreCase) && !phone.StartsWith("Tel:", StringComparison.OrdinalIgnoreCase))
+                                        phone = "Ph: " + phone;
+                                    t.Span(phone);
+                                    needSep = true;
+                                }
+                                if (hasWeb)
+                                {
+                                    if (needSep) t.Span("  ·  ");
+                                    string web = model.CompanyWebsite.Trim();
+                                    string fullUrl = web.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || web.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                                        ? web : "https://" + web;
+                                    t.Hyperlink(web, fullUrl).FontColor(orangeHex).Underline();
+                                }
+                            });
                         }
                     });
                 });
@@ -459,22 +463,40 @@ public class PdfRenderingService
                                 .FontSize(baseFontPt - 1.5f)
                                 .FontColor(textSecondaryHex);
                         }
-                        var contactParts = new List<string>();
-                        if (cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyEmail))
-                            contactParts.Add(model.CompanyEmail.Trim());
-                        if (cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyPhone) &&
-                            (string.IsNullOrWhiteSpace(model.CompanyEmail) || !model.CompanyEmail.Contains(model.CompanyPhone.Trim(), StringComparison.OrdinalIgnoreCase)))
-                            contactParts.Add(model.CompanyPhone.Trim());
-                        if (cfg.ShowCompanyWebsite && !string.IsNullOrWhiteSpace(model.CompanyWebsite) &&
-                            (string.IsNullOrWhiteSpace(model.CompanyEmail) || !model.CompanyEmail.Contains(model.CompanyWebsite.Trim(), StringComparison.OrdinalIgnoreCase)))
-                            contactParts.Add(model.CompanyWebsite.Trim());
-                        if (contactParts.Count > 0)
+                        bool hasEmail = cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyEmail);
+                        bool hasPhone = cfg.ShowCompanyContact && !string.IsNullOrWhiteSpace(model.CompanyPhone);
+                        bool hasWeb = cfg.ShowCompanyWebsite && !string.IsNullOrWhiteSpace(model.CompanyWebsite);
+
+                        if (hasEmail || hasPhone || hasWeb)
                         {
                             var contactItem = align ? infoCol.Item().AlignCenter() : infoCol.Item();
-                            string safeContact = string.Join("  ·  ", contactParts);
-                            contactItem.PaddingTop(1).Text(safeContact)
-                                .FontSize(baseFontPt - 1.5f)
-                                .FontColor(textSecondaryHex);
+                            contactItem.PaddingTop(1).Text(t =>
+                            {
+                                t.DefaultTextStyle(x => x.FontSize(baseFontPt - 1.5f).FontColor(textSecondaryHex));
+                                bool needSep = false;
+                                if (hasEmail)
+                                {
+                                    t.Span(model.CompanyEmail.Trim());
+                                    needSep = true;
+                                }
+                                if (hasPhone)
+                                {
+                                    if (needSep) t.Span("  ·  ");
+                                    string phone = model.CompanyPhone.Trim();
+                                    if (!phone.StartsWith("Ph:", StringComparison.OrdinalIgnoreCase) && !phone.StartsWith("Tel:", StringComparison.OrdinalIgnoreCase))
+                                        phone = "Ph: " + phone;
+                                    t.Span(phone);
+                                    needSep = true;
+                                }
+                                if (hasWeb)
+                                {
+                                    if (needSep) t.Span("  ·  ");
+                                    string web = model.CompanyWebsite.Trim();
+                                    string fullUrl = web.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || web.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                                        ? web : "https://" + web;
+                                    t.Hyperlink(web, fullUrl).FontColor(orangeHex).Underline();
+                                }
+                            });
                         }
                         if (cfg.ShowAuthorizedIdentifiers && !string.IsNullOrWhiteSpace(model.AuthorizedIdentifiers))
                         {
