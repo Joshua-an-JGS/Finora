@@ -115,7 +115,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
   ];
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto text-[#1F2937]">
+    <div className="space-y-6 w-full text-[#1F2937]">
       {/* Top Hero Card / Product Identity */}
       <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] px-6 pt-5 pb-0 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">

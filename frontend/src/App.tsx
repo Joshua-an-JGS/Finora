@@ -674,7 +674,8 @@ export const App: React.FC = () => {
         <main className="flex-1 min-h-0 overflow-y-auto">
           {/* Automatic Software Update Alert Modal/Banner */}
           {updateNotification && updateNotification.show && (
-            <div className="mx-6 mt-4 p-4 rounded-[10px] bg-[#FFFFFF] border-2 border-[#F47721]/50 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="px-6 pt-6 max-w-[1600px] mx-auto w-full">
+              <div className="p-4 rounded-[10px] bg-[#FFFFFF] border border-[#F47721]/50 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/30 shrink-0">
                   <Sparkles className="w-5 h-5 text-[#F47721]" />
@@ -759,6 +760,7 @@ export const App: React.FC = () => {
                   </>
                 )}
               </div>
+            </div>
             </div>
           )}
 
