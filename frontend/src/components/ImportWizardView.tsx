@@ -490,8 +490,8 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                           <Layers className="w-4 h-4 text-[#F47721]" />
                           <span>{ws.name}</span>
                         </div>
-                        <span className="text-[11.5px] font-semibold text-[#F47721] bg-[#FFF3E8] px-2 py-0.5 rounded-[5px]">
-                          {Math.max(0, ws.rowCount - 1)} rows · {ws.columnCount} cols
+                        <span className="text-[12px] font-semibold text-[#F47721]">
+                          ({Math.max(0, ws.rowCount - 1)} rows · {ws.columnCount} cols)
                         </span>
                       </div>
                       <div className="text-[11.5px] text-[#6B7280] mt-2 line-clamp-2">

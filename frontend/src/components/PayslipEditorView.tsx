@@ -1536,8 +1536,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
               <MinusCircle className="w-4 h-4 text-[#F47721]" />
             )}
             <h3 className="text-[15px] font-semibold text-[#1F2937]">{sectionTitle}</h3>
-            <span className="text-[11.5px] font-semibold text-[#F47721] bg-[#FFF3E8] px-2 py-0.5 rounded-[5px]">
-              {displayedRows.length} active
+            <span className="text-[12px] font-semibold text-[#F47721]">
+              ({displayedRows.length} active)
             </span>
           </div>
 
@@ -1959,8 +1959,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                         <span className="text-[14px] font-semibold text-[#1F2937] truncate">
                           {liveResolvedDocument.employeeName}
                         </span>
-                        <span className="text-[11.5px] font-semibold text-[#F47721] bg-[#FFF3E8] px-2 py-0.5 rounded-[5px]">
-                          {liveResolvedDocument.employeeCode}
+                        <span className="text-[12px] font-semibold font-mono text-[#F47721]">
+                          ({liveResolvedDocument.employeeCode})
                         </span>
                       </div>
                       <div className="text-[12px] text-[#6B7280] truncate">

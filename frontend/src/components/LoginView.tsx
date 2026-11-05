@@ -6,7 +6,6 @@ import {
   EyeOff,
   KeyRound,
   ArrowRight,
-  ShieldAlert,
   ArrowLeft,
   UserCheck,
   Building,
@@ -747,9 +746,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         ==================================================================== */}
         {isAdminGateway && !forgotMode && (
           <div className="space-y-5">
-            {/* Admin Header with Animated Logo & Administrator Badge */}
+            {/* Admin Header with Animated Logo */}
             <div className="text-center pb-4 border-b border-[#E5E7EB]">
-              <div className="flex justify-center mb-3">
+              <div className="flex justify-center">
                 <div className="relative inline-flex items-center justify-center select-none overflow-hidden max-w-[190px]">
                   <img
                     src="/splash_logo.png"
@@ -774,18 +773,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </div>
                 </div>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF3E8] border border-[#F47721]/30 text-[11px] font-bold text-[#F47721] tracking-wide uppercase">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>Administrator Access</span>
-              </div>
-              <p className="text-[12px] text-[#6B7280] mt-1.5">
-                Restricted system administration area
-              </p>
             </div>
 
-            {/* Security Notice */}
-            <div className="p-2.5 rounded-[7px] bg-[#FFF8F3] border border-[#F47721]/30 text-[11.5px] text-[#6B7280] text-center leading-tight">
-              Privileged gateway. All authentication attempts are verified, rate-limited, and recorded in the immutable audit log.
+            {/* Administrator Access Header */}
+            <div>
+              <label className="block text-[11.5px] font-bold text-[#6B7280] uppercase tracking-wider">
+                Administrator Access
+              </label>
+              <p className="text-[12px] text-[#6B7280] mt-0.5">
+                Restricted system administration area
+              </p>
             </div>
 
             {error && (
