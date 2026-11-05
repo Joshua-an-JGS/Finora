@@ -20,9 +20,10 @@ import {
   Info,
   Sparkles,
   RefreshCw,
-  Download,
   CheckCircle2,
   User,
+  X,
+  ArrowRight,
 } from 'lucide-react';
 import {
   apiRequest,
@@ -167,23 +168,6 @@ export const App: React.FC = () => {
     };
   }, [user]);
 
-  const handleDownloadUpdateFromBanner = async () => {
-    if (!updateNotification) return;
-    setUpdateNotification((prev) => (prev ? { ...prev, downloading: true, progress: 15 } : null));
-
-    const electronAPI = (window as any).electronAPI;
-    if (electronAPI?.updater?.download) {
-      await electronAPI.updater.download();
-    } else {
-      for (let p = 30; p <= 100; p += 25) {
-        await new Promise((r) => setTimeout(r, 350));
-        setUpdateNotification((prev) => (prev ? { ...prev, progress: p } : null));
-      }
-      setUpdateNotification((prev) =>
-        prev ? { ...prev, downloading: false, readyToInstall: true } : null
-      );
-    }
-  };
 
   const handleInstallUpdateFromBanner = async () => {
     const electronAPI = (window as any).electronAPI;
@@ -671,97 +655,112 @@ export const App: React.FC = () => {
         </header>
 
         {/* WORKSPACE BODY */}
-        <main className="flex-1 min-h-0 overflow-y-auto">
-          {/* Automatic Software Update Alert Modal/Banner */}
+        <main className="flex-1 min-h-0 overflow-y-auto relative">
+          {/* Automatic Software Update Alert Popup Toast (Bottom-Right Corner Slide-in) */}
           {updateNotification && updateNotification.show && (
-            <div className="px-6 pt-6 max-w-[1600px] mx-auto w-full">
-              <div className="p-4 rounded-[10px] bg-[#FFFFFF] border border-[#F47721]/50 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/30 shrink-0">
-                  <Sparkles className="w-5 h-5 text-[#F47721]" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-bold text-[#1F2937]">FINORA Update Available</span>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30 font-mono">
-                      v{updateNotification.version}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
-                      Verified Stable
-                    </span>
+            <aside
+              aria-label="Software Update Notification"
+              className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)] rounded-[12px] bg-[#FFFFFF] border border-[#E5E7EB] border-t-2 border-t-[#F47721] shadow-2xl p-4 animate-in slide-in-from-bottom-5 fade-in duration-300"
+            >
+              <div
+                className="flex items-start justify-between gap-3 cursor-pointer group"
+                onClick={() => {
+                  setActiveNav('about');
+                  setUpdateNotification(null);
+                }}
+                title="Click to view update details in About page"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/30 flex items-center justify-center text-[#F47721] shrink-0 group-hover:bg-[#F47721] group-hover:text-[#FFFFFF] transition-colors">
+                    <Sparkles className="w-4 h-4" />
                   </div>
-                  <p className="text-[12.5px] text-[#6B7280] mt-0.5">
-                    A new version of FINORA is ready to download. Enhancements to payroll processing, PDF rendering, and system stability.
-                  </p>
-
-                  {updateNotification.downloading && (
-                    <div className="mt-2.5 w-64 space-y-1">
-                      <div className="flex justify-between text-[11px] font-semibold text-[#1F2937]">
-                        <span>Downloading package...</span>
-                        <span>{updateNotification.progress || 0}%</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-[#E5E7EB] overflow-hidden">
-                        <div
-                          className="h-full bg-[#F47721] rounded-full transition-all duration-300"
-                          style={{ width: `${updateNotification.progress || 0}%` }}
-                        />
-                      </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13.5px] font-bold text-[#1F2937] group-hover:text-[#F47721] transition-colors">
+                        Update Available
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded font-mono text-[10.5px] font-bold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30">
+                        v{updateNotification.version}
+                      </span>
                     </div>
-                  )}
+                    <p className="text-[12px] text-[#6B7280] mt-1 leading-snug">
+                      FINORA v{updateNotification.version} is ready with enhancements. Click to review and install.
+                    </p>
+                  </div>
                 </div>
+
+                {/* Dismiss Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUpdateNotification(null);
+                  }}
+                  className="p-1 rounded-[6px] text-[#9CA3AF] hover:text-[#1F2937] hover:bg-[#F3F4F6] transition-colors shrink-0"
+                  title="Dismiss notification"
+                  aria-label="Dismiss notification"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {updateNotification.readyToInstall ? (
+              {updateNotification.downloading ? (
+                <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] space-y-1.5">
+                  <div className="flex justify-between text-[11.5px] font-semibold text-[#1F2937]">
+                    <span className="flex items-center gap-1.5 text-[#F47721]">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Downloading update...
+                    </span>
+                    <span>{updateNotification.progress || 0}%</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-[#E5E7EB] overflow-hidden">
+                    <div
+                      className="h-full bg-[#F47721] rounded-full transition-all duration-300"
+                      style={{ width: `${updateNotification.progress || 0}%` }}
+                    />
+                  </div>
+                </div>
+              ) : updateNotification.readyToInstall ? (
+                <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleInstallUpdateFromBanner}
-                    className="px-4 py-2 rounded-[7px] bg-[#059669] hover:bg-[#047857] text-[#FFFFFF] text-[12.5px] font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                    className="flex-1 py-1.5 px-3 rounded-[7px] bg-[#059669] hover:bg-[#047857] text-[#FFFFFF] text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Install &amp; Restart</span>
                   </button>
-                ) : updateNotification.downloading ? (
                   <button
                     type="button"
-                    disabled
-                    className="px-4 py-2 rounded-[7px] bg-[#F3F4F6] text-[#9CA3AF] text-[12.5px] font-semibold flex items-center gap-1.5 cursor-not-allowed"
+                    onClick={() => setUpdateNotification(null)}
+                    className="py-1.5 px-3 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] text-[#6B7280] hover:text-[#1F2937] text-[12px] font-medium transition-colors cursor-pointer"
                   >
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#F47721]" />
-                    <span>Downloading...</span>
+                    Later
                   </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setUpdateNotification(null)}
-                      className="px-3.5 py-2 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] text-[#6B7280] hover:text-[#1F2937] hover:bg-[#F9FAFB] text-[12px] font-semibold transition-colors"
-                    >
-                      Remind Me Later
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveNav('about');
-                        setUpdateNotification(null);
-                      }}
-                      className="px-3.5 py-2 rounded-[7px] bg-[#FFFFFF] border border-[#F47721] text-[#F47721] hover:bg-[#FFF3E8] text-[12px] font-semibold transition-colors"
-                    >
-                      View Release Notes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDownloadUpdateFromBanner}
-                      className="px-4 py-2 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download Update</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            </div>
+                </div>
+              ) : (
+                <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveNav('about');
+                      setUpdateNotification(null);
+                    }}
+                    className="flex-1 py-1.5 px-3 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <span>View &amp; Update</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUpdateNotification(null)}
+                    className="py-1.5 px-2.5 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] text-[#6B7280] hover:text-[#1F2937] text-[12px] font-medium transition-colors cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </aside>
           )}
 
           {activeNav === 'dashboard' && (
