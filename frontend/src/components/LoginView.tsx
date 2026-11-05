@@ -15,6 +15,7 @@ import {
   Check,
   CheckCircle2,
   Key,
+  ShieldCheck,
 } from 'lucide-react';
 import { apiRequest, setStoredSession } from '../services/api';
 import type { UserProfile } from '../types/payroll';
@@ -36,10 +37,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Mode: 'normal' (Operator/Viewer) vs 'admin-gateway' (Protected Administrator Access)
   const [isAdminGateway, setIsAdminGateway] = useState(false);
 
-  // Normal Login Credentials (Operator & Viewer ONLY) - Clean Empty Production Defaults
+  // Normal Login Credentials (Administrator, Operator & Viewer) - Clean Empty Production Defaults
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRoleType, setSelectedRoleType] = useState<'operator' | 'viewer'>('operator');
+  const [selectedRoleType, setSelectedRoleType] = useState<'administrator' | 'operator' | 'viewer'>('administrator');
+  const [normalMfaCode, setNormalMfaCode] = useState('');
+  const [showMfaInput, setShowMfaInput] = useState(false);
 
   // Admin Gateway Credentials - Clean Empty Production Defaults
   const [adminId, setAdminId] = useState('');
@@ -124,7 +127,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     };
   }, []);
 
-  // Standard Login for Normal Roles (Operator / Viewer)
+  // Standard Login for All Roles (Administrator, Operator, Viewer)
   const handleNormalLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -135,8 +138,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         body: JSON.stringify({
           usernameOrEmail: usernameOrEmail.trim(),
           password,
+          mfaCode: normalMfaCode.trim() ? normalMfaCode.trim() : undefined,
         }),
       });
+
+      if (res.mfaRequired && !res.token) {
+        setShowMfaInput(true);
+        setInfoMessage(res.message || 'Multi-Factor Authentication code is required.');
+        setLoading(false);
+        return;
+      }
 
       setStoredSession(res.token, res.user);
       onLoginSuccess(res.user);
@@ -214,7 +225,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const fillNormalRole = (role: 'operator' | 'viewer') => {
+  const fillNormalRole = (role: 'administrator' | 'operator' | 'viewer') => {
     setError(null);
     setSelectedRoleType(role);
   };
@@ -578,16 +589,28 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
             </div>
 
-            {/* Role Selection Tabs for Everyday Users */}
+            {/* Role Selection Tabs */}
             <div className="mb-5 space-y-1.5">
               <label className="block text-[11.5px] font-bold text-[#6B7280] uppercase tracking-wider">
                 Sign in as
               </label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fillNormalRole('administrator')}
+                  className={`py-2 px-2 rounded-[7px] text-[12.5px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    selectedRoleType === 'administrator'
+                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
+                      : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Admin</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => fillNormalRole('operator')}
-                  className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-2 rounded-[7px] text-[12.5px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'operator'
                       ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
                       : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
@@ -599,7 +622,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={() => fillNormalRole('viewer')}
-                  className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-2 rounded-[7px] text-[12.5px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'viewer'
                       ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
                       : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
@@ -694,6 +717,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </button>
                 </div>
               </div>
+
+              {showMfaInput && (
+                <div className="animate-in fade-in duration-150">
+                  <label className="block text-[12px] font-medium text-[#6B7280] mb-1.5">
+                    Multi-Factor Authentication (MFA) Code
+                  </label>
+                  <div className="relative">
+                    <Key className="w-4 h-4 text-[#9CA3AF] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={normalMfaCode}
+                      onChange={(e) => setNormalMfaCode(e.target.value)}
+                      placeholder="6-digit authentication code"
+                      className="w-full pl-10 pr-3.5 py-2 text-[13.5px] border border-[#F47721] rounded-[7px] bg-[#FFFFFF] text-[#1F2937] focus:border-[#F47721] focus:outline-hidden font-mono tracking-wider"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"
