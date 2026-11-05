@@ -1951,7 +1951,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
               {liveResolvedDocument && (
                 <div className="pt-2 border-t border-[#E5E7EB] flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/25 flex items-center justify-center text-[#F47721] font-semibold text-[13px] shrink-0">
+                    <div className="w-10 h-10 rounded-[8px] bg-[#F47721] flex items-center justify-center text-[#FFFFFF] font-bold text-[13px] shrink-0 shadow-xs select-none">
                       {empInitials}
                     </div>
                     <div className="min-w-0">
