@@ -436,7 +436,7 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
       rowBorders && (rowMode === 'All' || rowMode === 'HeaderOnly')
         ? `${rowThickness}px solid ${rowColor}`
         : 'none';
-    const effLabelPercent = Math.min(Math.max(labelPercent, 40), 58);
+    const effLabelPercent = Math.min(Math.max(labelPercent || 65, 40), 80);
     const effAmountPercent = 100 - effLabelPercent;
     return (
       <div
@@ -583,7 +583,7 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
       doc.visibleEmployerContributions && doc.visibleEmployerContributions.length > 0;
     if (!hasEarnings && !hasDeductions && !hasEmployer) return null;
     const sideBySide = cfg.tableLayoutMode !== 'Stacked' && hasEarnings && hasDeductions;
-    const maxSalaryRows = sideBySide ? Math.max(doc.visibleEarnings.length, doc.visibleDeductions.length) : 0;
+    const maxSalaryRows = 0;
     const tableWidth = cfg.tableWidthPercent || 100;
     const gap = cfg.tableSpacingPx !== undefined ? cfg.tableSpacingPx : 16;
     const earnLabelW = cfg.earningsLabelWidthPercent || 65;

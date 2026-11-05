@@ -625,7 +625,7 @@ public class PdfRenderingService
             return;
         bool sideBySide = cfg.TableLayoutMode == "SideBySide" && hasEarnings && hasDeductions;
         int spacing = cfg.TableSpacingPx > 0 ? cfg.TableSpacingPx : 10;
-        int maxSalaryRows = sideBySide ? Math.Max(model.VisibleEarnings.Count, model.VisibleDeductions.Count) : 0;
+        int maxSalaryRows = 0;
         container.Column(col =>
         {
             col.Spacing(10);
@@ -760,7 +760,7 @@ public class PdfRenderingService
         bool colBordersEnabled = cfg.EnableColumnBorders;
         float colBorderThickness = cfg.ColumnBorderThicknessPt > 0 ? cfg.ColumnBorderThicknessPt : 1.0f;
         string colBorderColor = SafeHex(cfg.ColumnBorderColor, outerBorderColor);
-        int effectiveLabelWeight = Math.Clamp(labelWidthPercent, 40, 58);
+        int effectiveLabelWeight = Math.Clamp(labelWidthPercent > 0 ? labelWidthPercent : 65, 40, 80);
         int amountWeight = 100 - effectiveLabelWeight;
         var box = container;
         if (showOuterBorder)
