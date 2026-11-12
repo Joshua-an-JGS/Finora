@@ -833,8 +833,13 @@ public class AdminAndSettingsController : ControllerBase
     // ========================================================================
     private string GetBaseDataDirectory()
     {
-        return Environment.GetEnvironmentVariable("FINORA_DATA_DIR")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FINORA");
+        var custom = Environment.GetEnvironmentVariable("FINORA_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(custom)) return custom;
+
+        var programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "FINORA");
+        if (Directory.Exists(programData)) return programData;
+
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FINORA");
     }
 
     [HttpGet("admin/system/storage-info")]

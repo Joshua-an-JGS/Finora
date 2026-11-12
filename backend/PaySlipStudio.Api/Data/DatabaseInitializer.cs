@@ -57,36 +57,20 @@ public static class DatabaseInitializer
             }
         }
 
-        // 2. Seed Default Standard Users
-        await EnsureUserAsync(
-            userManager,
-            email: "operator@amtdc.org",
-            userName: "operator",
-            password: "operator@12345",
-            fullName: "Accounts Operator",
-            department: "Finance & Accounts",
-            role: AppRoles.AccountsOperator,
-            mfaRequired: false);
-
-        await EnsureUserAsync(
-            userManager,
-            email: "viewer@amtdc.org",
-            userName: "viewer",
-            password: "viewer@12345",
-            fullName: "Payroll Viewer",
-            department: "General Administration",
-            role: AppRoles.Viewer,
-            mfaRequired: false);
-
-        await EnsureUserAsync(
-            userManager,
-            email: "admin@amtdc.org",
-            userName: "admin@amtdc.org",
-            password: "Admin@12345!",
-            fullName: "System Administrator",
-            department: "IT & Governance",
-            role: AppRoles.Administrator,
-            mfaRequired: false);
+        // 2. Ensure Existing Installations with an Administrator are Marked Initialized
+        var existingAdmins = await userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+        if (existingAdmins.Count > 0)
+        {
+            var company = await db.CompanySettings.FirstOrDefaultAsync();
+            if (company != null && !company.IsInitialized)
+            {
+                company.IsInitialized = true;
+                company.CompanySetupCompleted = true;
+                company.InitializedAtUtc = company.InitializedAtUtc ?? DateTime.UtcNow;
+                company.InitializedByAdminUsername = company.InitializedByAdminUsername ?? existingAdmins[0].UserName;
+                await db.SaveChangesAsync();
+            }
+        }
 
         // 3. Seed CompanySettings
         if (!await db.CompanySettings.AnyAsync())
@@ -112,24 +96,11 @@ public static class DatabaseInitializer
                 EmailProviderMode = "Sandbox",
                 SmtpFromEmail = "payroll@organization.org",
                 SmtpFromName = "FINORA Payroll Administration",
+                IsInitialized = false,
+                CompanySetupCompleted = false,
                 UpdatedAtUtc = DateTime.UtcNow
             });
             await db.SaveChangesAsync();
-        }
-
-        // 4. Ensure Existing Installations with an Administrator are Marked Initialized
-        var existingAdmins = await userManager.GetUsersInRoleAsync(AppRoles.Administrator);
-        if (existingAdmins.Count > 0)
-        {
-            var company = await db.CompanySettings.FirstOrDefaultAsync();
-            if (company != null && !company.IsInitialized)
-            {
-                company.IsInitialized = true;
-                company.CompanySetupCompleted = true;
-                company.InitializedAtUtc = company.InitializedAtUtc ?? DateTime.UtcNow;
-                company.InitializedByAdminUsername = company.InitializedByAdminUsername ?? existingAdmins[0].UserName;
-                await db.SaveChangesAsync();
-            }
         }
 
         // 5. Seed Default Payslip Templates

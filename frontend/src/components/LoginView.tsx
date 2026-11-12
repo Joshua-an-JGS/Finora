@@ -14,17 +14,20 @@ import {
   Check,
   CheckCircle2,
   Key,
+  Shield,
 } from 'lucide-react';
 import { apiRequest, setStoredSession } from '../services/api';
 import type { UserProfile } from '../types/payroll';
 
 interface LoginViewProps {
+  initialMode?: 'normal' | 'first-time-setup';
   onLoginSuccess: (user: UserProfile) => void;
+  onSetupCompleted?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ initialMode = 'normal', onLoginSuccess, onSetupCompleted }) => {
   // First-Time Customer Setup State
-  const [isFirstRunSetup, setIsFirstRunSetup] = useState(false);
+  const [isFirstRunSetup, setIsFirstRunSetup] = useState(initialMode === 'first-time-setup');
   const [setupOrgName, setSetupOrgName] = useState('');
   const [setupFullName, setSetupFullName] = useState('');
   const [setupEmail, setSetupEmail] = useState('');
@@ -73,6 +76,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   // Check whether the installation requires first-time Administrator onboarding
   useEffect(() => {
+    if (initialMode === 'first-time-setup') {
+      setIsFirstRunSetup(true);
+      return;
+    }
     apiRequest<{ isSetupRequired: boolean }>('/api/auth/setup-status')
       .then((res) => {
         if (res?.isSetupRequired) {
@@ -80,7 +87,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [initialMode]);
 
   // Listen for Hidden Admin Gateway Shortcut: Ctrl + Shift + Alt + A
   // and Direct Protected Route: /secure-admin-access or #/secure-admin-access or ?gateway=admin
@@ -268,6 +275,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       });
       if (res && res.recoveryKey) {
         setSetupSuccessRecoveryKey(res.recoveryKey);
+        if (res.token && res.user) {
+          setStoredSession(res.token, { ...res.user, isAdminSession: true });
+        }
       } else {
         setIsFirstRunSetup(false);
         setInfoMessage('Administrator account created successfully! Please sign in with your credentials to begin.');
@@ -379,22 +389,40 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </div>
 
                 <div className="p-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-[8px] text-[11.5px] text-[#4B5563] leading-relaxed">
-                  <strong>Admin Sign-In Shortcut:</strong> The Administrator Gateway is kept hidden from regular staff. On the sign-in screen, press <kbd className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-[#FFFFFF] border border-[#D1D5DB] rounded-[4px] shadow-2xs">Ctrl + Shift + Alt + A</kbd> to open the gateway.
+                  <strong>Administrator Access:</strong> The Administrator Gateway is kept hidden from regular staff. On the sign-in screen, press <kbd className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-[#FFFFFF] border border-[#D1D5DB] rounded-[4px] shadow-2xs">Ctrl + Shift + Alt + A</kbd> to open the gateway.
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSetupSuccessRecoveryKey(null);
-                    setIsFirstRunSetup(false);
-                    setIsAdminGateway(false);
-                    setInfoMessage('Administrator account created successfully! Press Ctrl+Shift+Alt+A to access the Admin Gateway.');
-                  }}
-                  className="w-full mt-2 py-2.5 px-4 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
-                >
-                  <span>Proceed to Sign In</span>
-                  <ArrowRight className="w-4 h-4 text-[#FFFFFF]" />
-                </button>
+                <div className="flex flex-col gap-2.5 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetupSuccessRecoveryKey(null);
+                      setIsFirstRunSetup(false);
+                      setIsAdminGateway(false);
+                      setInfoMessage(null);
+                      if (onSetupCompleted) onSetupCompleted();
+                    }}
+                    className="w-full py-2.5 px-4 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <span>Proceed to Sign In</span>
+                    <ArrowRight className="w-4 h-4 text-[#FFFFFF]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetupSuccessRecoveryKey(null);
+                      setIsFirstRunSetup(false);
+                      setIsAdminGateway(true);
+                      setAdminId(setupUsername.trim());
+                      if (onSetupCompleted) onSetupCompleted();
+                      setInfoMessage('Administrator account created! Please authenticate via the Administrator Gateway.');
+                    }}
+                    className="w-full py-2.5 px-4 rounded-[7px] bg-[#FFF3E8] border border-[#F47721]/30 hover:border-[#F47721] text-[#F47721] font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Open Administrator Gateway</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -592,7 +620,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
             </div>
 
-            {/* Role Selection Tabs for Everyday Users (Operator / Viewer) */}
+            {/* Role Selection Tabs for Everyday Users (Operator / Viewer Only) */}
             <div className="mb-5 space-y-1.5">
               <label className="block text-[11.5px] font-bold text-[#6B7280] uppercase tracking-wider">
                 Sign in as
@@ -603,7 +631,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   onClick={() => fillNormalRole('operator')}
                   className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'operator'
-                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
+                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFF3E8] shadow-2xs'
                       : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
                   }`}
                 >
@@ -615,7 +643,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   onClick={() => fillNormalRole('viewer')}
                   className={`py-2 px-3 rounded-[7px] text-[13px] font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     selectedRoleType === 'viewer'
-                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFFFFF] shadow-2xs'
+                      ? 'border border-[#F47721] text-[#F47721] bg-[#FFF3E8] shadow-2xs'
                       : 'border border-[#E5E7EB] text-[#6B7280] bg-[#FFFFFF] hover:border-[#D1D5DB] hover:text-[#1F2937]'
                   }`}
                 >
@@ -628,12 +656,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             {error && (
               <div className="mb-4 p-3 rounded-[8px] bg-[#FFF3E8] border border-[#F47721]/40 text-[12.5px] text-[#1F2937] font-medium">
                 {error}
-              </div>
-            )}
-
-            {infoMessage && (
-              <div className="mb-4 p-3 rounded-[8px] bg-[#FFF8F3] border border-[#E5E7EB] text-[12.5px] text-[#1F2937]">
-                {infoMessage}
               </div>
             )}
 

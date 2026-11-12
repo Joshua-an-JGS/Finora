@@ -52,6 +52,10 @@
       ],
       "icon": "build/icon.ico",
       "requestedExecutionLevel": "asInvoker",
+      "publisherName": [
+        "Joshua Godson"
+      ],
+      "legalTrademarks": "FINORA",
       "sign": "./electron/sign.cjs"
     },
     "nsis": {
@@ -65,7 +69,7 @@
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "runAfterFinish": true,
-      "artifactName": "FINORA Setup.${ext}"
+      "artifactName": "FINORA_Setup.${ext}"
     }
   },
   "dependencies": {

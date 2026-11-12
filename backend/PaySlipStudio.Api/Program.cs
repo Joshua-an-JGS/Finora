@@ -33,9 +33,28 @@ bool isDesktopMode = string.Equals(Environment.GetEnvironmentVariable("FINORA_DE
     || string.Equals(builder.Configuration["FINORA_DESKTOP_MODE"], "true", StringComparison.OrdinalIgnoreCase);
 
 string baseDataDir = Environment.GetEnvironmentVariable("FINORA_DATA_DIR")
-    ?? (isDesktopMode
-        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FINORA")
-        : AppContext.BaseDirectory);
+    ?? ResolveDesktopDataDirectory(isDesktopMode);
+
+static string ResolveDesktopDataDirectory(bool desktopMode)
+{
+    if (!desktopMode) return AppContext.BaseDirectory;
+
+    var programDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "FINORA");
+    var localAppDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FINORA");
+
+    try
+    {
+        Directory.CreateDirectory(programDataDir);
+        var probe = Path.Combine(programDataDir, ".probe");
+        File.WriteAllText(probe, "ok");
+        File.Delete(probe);
+        return programDataDir;
+    }
+    catch
+    {
+        return localAppDataDir;
+    }
+}
 
 // Standard FINORA Data Storage Structure
 var dataDir = Path.Combine(baseDataDir, "Data");
@@ -55,13 +74,8 @@ foreach (var dir in new[] { dataDir, payslipsDir, reportsDir, importsDir, templa
 builder.Configuration["Storage:RootPath"] = Path.Combine(baseDataDir, "Documents");
 builder.Configuration["FINORA_BASE_DATA_DIR"] = baseDataDir;
 
-var configuredProvider = builder.Configuration["Database:Provider"] ?? "PostgreSql";
+var configuredProvider = builder.Configuration["Database:Provider"] ?? "Sqlite";
 var effectiveProvider = isDesktopMode ? "Sqlite" : configuredProvider;
-
-if (string.Equals(effectiveProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
-{
-    EnsureLocalPostgresRunning();
-}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -73,8 +87,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     else
     {
         var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
-                      ?? "Host=127.0.0.1;Port=5432;Database=payslip_studio;Username=postgres";
-        options.UseNpgsql(connStr);
+                      ?? $"Data Source={Path.Combine(dataDir, "finora.db")}";
+        options.UseSqlite(connStr);
     }
 });
 

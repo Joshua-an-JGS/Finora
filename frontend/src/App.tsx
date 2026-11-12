@@ -10,6 +10,7 @@ import {
   Send,
   FileBarChart2,
   Shield,
+  ShieldAlert,
   ClipboardList,
   Settings as SettingsIcon,
   Search,
@@ -86,6 +87,41 @@ const MONTHS = [
 
 export const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(() => getStoredUser());
+  const [startupStatus, setStartupStatus] = useState<'checking' | 'setup-required' | 'ready' | 'db-error'>('checking');
+  const [dbErrorMessage, setDbErrorMessage] = useState<string>('');
+
+  const checkStartupRouting = async () => {
+    setStartupStatus('checking');
+    try {
+      const res = await apiRequest<{
+        isSetupRequired: boolean;
+        isInitialized: boolean;
+        adminCount?: number;
+        error?: string;
+        message?: string;
+      }>('/api/auth/setup-status');
+
+      if (res?.isSetupRequired) {
+        clearStoredSession();
+        setUser(null);
+        setStartupStatus('setup-required');
+      } else {
+        setStartupStatus('ready');
+        const stored = getStoredUser();
+        if (stored) {
+          setUser(stored);
+        }
+      }
+    } catch (err: any) {
+      console.error('FINORA startup check failed:', err);
+      setDbErrorMessage(err.message || 'Could not verify database connection at %ProgramData%\\FINORA\\Data\\finora.db.');
+      setStartupStatus('db-error');
+    }
+  };
+
+  useEffect(() => {
+    checkStartupRouting();
+  }, []);
   const [viewMode, setViewMode] = useState<'workspace' | 'admin-console'>('workspace');
   const [activeNav, setActiveNav] = useState<NavKey>('editor');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -243,9 +279,80 @@ export const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [globalSearch, activeMonth, activeYear, user]);
 
+  // 1. Mandatory Startup Checking: FINORA Branded Splash
+  if (startupStatus === 'checking') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] text-[#1F2937] p-4 select-none">
+        <div className="relative inline-flex items-center justify-center mb-6 max-w-[220px]">
+          <img src="/splash_logo.png" alt="FINORA" className="w-full h-auto object-contain" />
+        </div>
+        <div className="flex items-center gap-2.5 text-[13px] font-medium text-[#6B7280]">
+          <RefreshCw className="w-4 h-4 animate-spin text-[#F47721]" />
+          <span>Verifying system initialization &amp; database status...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Database Initialization / Connection Error Screen
+  if (startupStatus === 'db-error') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] p-4 select-none">
+        <div className="w-full max-w-[480px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] p-6 shadow-sm text-center">
+          <div className="w-12 h-12 rounded-full bg-[#FEF2F2] border border-[#FECACA] flex items-center justify-center text-[#DC2626] mx-auto mb-3.5">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h2 className="text-[17px] font-bold text-[#1F2937]">Database Initialization Error</h2>
+          <p className="text-[12.5px] text-[#6B7280] mt-1.5 leading-relaxed">
+            FINORA could not establish a connection to the local database at <code className="px-1.5 py-0.5 bg-[#F3F4F6] text-[#1F2937] rounded font-mono text-[11px]">%ProgramData%\FINORA\Data\finora.db</code>.
+          </p>
+          <div className="mt-4 p-3 bg-[#FEF2F2] border border-[#EF4444]/30 rounded-[8px] text-[12px] text-[#991B1B] text-left font-mono break-all">
+            {dbErrorMessage || 'Unable to connect to local database engine.'}
+          </div>
+          <button
+            type="button"
+            onClick={checkStartupRouting}
+            className="w-full mt-5 py-2.5 px-4 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] font-semibold text-[13.5px] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry Database Connection</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. First-Time Setup Required: Display First-Time Setup Wizard Directly
+  if (startupStatus === 'setup-required') {
+    return (
+      <LoginView
+        initialMode="first-time-setup"
+        onLoginSuccess={(u) => {
+          setUser(u);
+          setStartupStatus('ready');
+          if (u.role === 'Administrator') {
+            if (u.companySetupCompleted === false) {
+              setShowCompanyWizard(true);
+            }
+            if (u.isAdminSession) {
+              setViewMode('admin-console');
+            } else {
+              setViewMode('workspace');
+            }
+          }
+        }}
+        onSetupCompleted={() => {
+          setStartupStatus('ready');
+        }}
+      />
+    );
+  }
+
+  // 4. Normal Login (When no active user session)
   if (!user) {
     return (
       <LoginView
+        initialMode="normal"
         onLoginSuccess={(u) => {
           setUser(u);
           if (u.role === 'Administrator') {

@@ -7,6 +7,9 @@
     <Product>FINORA</Product>
     <Description>FINORA — Finance &amp; Payroll Management System</Description>
     <Company>FINORA</Company>
+    <Authors>Joshua Godson</Authors>
+    <Copyright>Copyright © 2026 FINORA. All rights reserved.</Copyright>
+    <AssemblyTitle>FINORA Core Payroll API Engine</AssemblyTitle>
     <Version>1.0.2</Version>
     <FileVersion>1.0.2.0</FileVersion>
     <AssemblyVersion>1.0.2.0</AssemblyVersion>

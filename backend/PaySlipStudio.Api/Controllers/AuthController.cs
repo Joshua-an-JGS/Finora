@@ -49,24 +49,58 @@ public class AuthController : ControllerBase
 
     /// <summary>
     /// Checks whether the FINORA installation requires initial Administrator onboarding.
-    /// Returns true if the system has not been marked initialized AND no Administrator accounts exist in the database.
+    /// Uses the local database as authoritative source: returns isSetupRequired = true if zero Administrator accounts exist.
     /// </summary>
     [HttpGet("setup-status")]
     [AllowAnonymous]
     public async Task<IActionResult> GetSetupStatus()
     {
-        var settings = await _db.CompanySettings.FirstOrDefaultAsync();
-        var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
-        var isSetupRequired = (settings == null || !settings.IsInitialized) && admins.Count == 0;
-
-        return Ok(new
+        try
         {
-            isSetupRequired,
-            isInitialized = !isSetupRequired,
-            companySetupCompleted = settings?.CompanySetupCompleted ?? false,
-            systemVersion = "1.0.0",
-            appName = "FINORA"
-        });
+            var canConnect = await _db.Database.CanConnectAsync();
+            if (!canConnect)
+            {
+                return StatusCode(503, new
+                {
+                    error = "DatabaseConnectionFailed",
+                    message = "Could not connect to the local FINORA database. Please verify file permissions in %ProgramData%\\FINORA\\Data\\."
+                });
+            }
+
+            var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+            var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+
+            // Authoritative rule: If ZERO Administrator accounts exist, initial Administrator setup is MANDATORY.
+            bool isSetupRequired = admins.Count == 0;
+
+            // Self-healing synchronization: if admins exist but IsInitialized was false, mark it true
+            if (!isSetupRequired && settings != null && !settings.IsInitialized)
+            {
+                settings.IsInitialized = true;
+                settings.CompanySetupCompleted = true;
+                settings.InitializedAtUtc ??= DateTime.UtcNow;
+                settings.InitializedByAdminUsername ??= admins[0].UserName;
+                await _db.SaveChangesAsync();
+            }
+
+            return Ok(new
+            {
+                isSetupRequired,
+                isInitialized = !isSetupRequired,
+                adminCount = admins.Count,
+                companySetupCompleted = settings?.CompanySetupCompleted ?? false,
+                systemVersion = "1.0.2",
+                appName = "FINORA"
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "DatabaseInitializationError",
+                message = "Database integrity verification failed: " + ex.Message
+            });
+        }
     }
 
     /// <summary>
@@ -82,7 +116,7 @@ public class AuthController : ControllerBase
         {
             var settings = await _db.CompanySettings.FirstOrDefaultAsync();
             var admins = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
-            if ((settings != null && settings.IsInitialized) || admins.Count > 0)
+            if (admins.Count > 0 || (settings != null && settings.IsInitialized))
             {
                 return BadRequest(new { message = "FINORA workspace is already initialized. First-time setup can only be executed once." });
             }
@@ -186,11 +220,27 @@ public class AuthController : ControllerBase
                 $"Initial System Administrator '{adminUser.FullName}' (@{adminUser.UserName}, {adminUser.Email}) registered. FINORA workspace initialized.",
                 ipAddress: ip);
 
+            var token = GenerateJwtToken(adminUser, AppRoles.Administrator, isAdminGateway: true);
+
             return Ok(new
             {
                 success = true,
                 recoveryKey,
-                message = "Administrator account created successfully. FINORA workspace initialized. Please sign in with your new credentials to begin."
+                token,
+                user = new
+                {
+                    id = adminUser.Id,
+                    userName = adminUser.UserName,
+                    email = adminUser.Email,
+                    fullName = adminUser.FullName,
+                    department = adminUser.Department,
+                    role = AppRoles.Administrator,
+                    isAdminSession = true,
+                    mfaRequired = adminUser.MfaRequired,
+                    mfaConfigured = adminUser.MfaConfigured,
+                    companySetupCompleted = false
+                },
+                message = "Administrator account created successfully. FINORA workspace initialized."
             });
         }
         finally
@@ -258,7 +308,12 @@ public class AuthController : ControllerBase
         }
 
         var identifier = req.AdminIdentifier.Trim();
-        var user = await _userManager.FindByEmailAsync(identifier) ?? await _userManager.FindByNameAsync(identifier);
+        var user = await _userManager.FindByEmailAsync(identifier)
+                   ?? await _userManager.FindByNameAsync(identifier)
+                   ?? await _db.Users.FirstOrDefaultAsync(u =>
+                       u.NormalizedUserName == identifier.ToUpper() ||
+                       u.NormalizedEmail == identifier.ToUpper() ||
+                       (u.FullName != null && u.FullName.ToLower() == identifier.ToLower()));
         if (user == null || !await _userManager.IsInRoleAsync(user, AppRoles.Administrator))
         {
             return BadRequest(new { message = "Administrator account matching this identifier was not found." });
@@ -301,145 +356,147 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> AdminLogin([FromBody] AdminLoginRequest req)
     {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var rateKey = $"{ip}_{req?.AdministratorId?.Trim().ToLowerInvariant()}";
-
-        // Progressive rate limit defense against brute-force attacks on admin gateway
-        if (_adminRateLimit.TryGetValue(rateKey, out var rl) && rl.Attempts >= 5)
+        try
         {
-            if (DateTime.UtcNow - rl.LastAttempt < TimeSpan.FromMinutes(5))
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rateKey = $"{ip}_{req?.AdministratorId?.Trim().ToLowerInvariant()}";
+
+            // Progressive rate limit defense against brute-force attacks on admin gateway
+            if (_adminRateLimit.TryGetValue(rateKey, out var rl) && rl.Attempts >= 5)
             {
-                await _audit.RecordAsync("SYSTEM", req?.AdministratorId ?? "unknown", AppRoles.Administrator,
-                    "Auth.AdminRateLimitExceeded", "SecurityGateway", null,
-                    $"Excessive admin gateway login attempts from IP '{ip}'. Throttling enforced.", ipAddress: ip);
-                return StatusCode(429, new { message = "Too many failed administrator login attempts. Please wait 5 minutes before trying again." });
-            }
-            else
-            {
-                _adminRateLimit.TryRemove(rateKey, out _);
-            }
-        }
-
-        if (req == null || string.IsNullOrWhiteSpace(req.AdministratorId) || string.IsNullOrWhiteSpace(req.Password))
-        {
-            return BadRequest(new { message = "Please enter both Administrator ID and password." });
-        }
-
-        var identifier = req.AdministratorId.Trim();
-        var user = await _userManager.FindByEmailAsync(identifier)
-                   ?? await _userManager.FindByNameAsync(identifier);
-
-        // Constant-time mitigation delay (350ms) to resist timing attacks
-        await Task.Delay(350);
-
-        if (user == null || !user.IsActive)
-        {
-            RecordFailedAdminAttempt(rateKey);
-            await _audit.RecordAsync("UNKNOWN", identifier, AppRoles.Administrator, "Auth.AdminLoginFailed", "ApplicationUser", null,
-                $"Failed admin login attempt for '{identifier}'. Account not found or inactive.", ipAddress: ip);
-            return Unauthorized(new { message = "Invalid administrator credentials." });
-        }
-
-        // Server-Side Strict Role Enforcement: Must have Administrator role
-        var roles = await _userManager.GetRolesAsync(user);
-        if (!roles.Contains(AppRoles.Administrator))
-        {
-            RecordFailedAdminAttempt(rateKey);
-            await _audit.RecordAsync(user.Id, user.UserName ?? identifier, user.RoleName, "Auth.AdminLoginFailed", "ApplicationUser", user.Id,
-                $"Unauthorized admin gateway access attempted by non-admin account '{identifier}' with role '{user.RoleName}'. Access denied.", ipAddress: ip);
-            return Unauthorized(new { message = "Invalid administrator credentials." });
-        }
-
-        var passwordAttempt = req.Password?.Trim() ?? string.Empty;
-        var result = await _signInManager.CheckPasswordSignInAsync(user, passwordAttempt, lockoutOnFailure: false);
-
-        // Fallback for bootstrap administrator account if initial password matches
-        if (!result.Succeeded && (passwordAttempt == "Admin@12345!" || string.Equals(passwordAttempt, "Admin@12345!", StringComparison.OrdinalIgnoreCase)))
-        {
-            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-            await _userManager.ResetPasswordAsync(user, resetToken, "Admin@12345!");
-            await _userManager.SetLockoutEndDateAsync(user, null);
-            await _userManager.ResetAccessFailedCountAsync(user);
-            result = Microsoft.AspNetCore.Identity.SignInResult.Success;
-        }
-
-        if (result.IsLockedOut)
-        {
-            await _audit.RecordAsync(user.Id, user.UserName ?? identifier, AppRoles.Administrator, "Auth.AdminLockout", "ApplicationUser", user.Id,
-                $"Administrator account '{identifier}' locked out due to multiple failed login attempts.", ipAddress: ip);
-            return StatusCode(423, new { message = "Administrator account is temporarily locked due to multiple failed login attempts. Please try again in 5 minutes." });
-        }
-
-        if (!result.Succeeded)
-        {
-            RecordFailedAdminAttempt(rateKey);
-            await _audit.RecordAsync(user.Id, user.UserName ?? identifier, AppRoles.Administrator, "Auth.AdminLoginFailed", "ApplicationUser", user.Id,
-                $"Failed administrator password verification for '{identifier}'.", ipAddress: ip);
-            return Unauthorized(new { message = "Invalid administrator credentials." });
-        }
-
-        // MFA Verification for Administrator Access
-        if (user.MfaRequired || !string.IsNullOrWhiteSpace(req.MfaCode))
-        {
-            if (string.IsNullOrWhiteSpace(req.MfaCode))
-            {
-                return Ok(new
+                if (DateTime.UtcNow - rl.LastAttempt < TimeSpan.FromMinutes(5))
                 {
-                    mfaRequired = true,
-                    message = "Multi-Factor Authentication code is required for Administrator access."
-                });
+                    await _audit.RecordAsync("SYSTEM", req?.AdministratorId ?? "unknown", AppRoles.Administrator,
+                        "Auth.AdminRateLimitExceeded", "SecurityGateway", "gateway",
+                        $"Excessive admin gateway login attempts from IP '{ip}'. Throttling enforced.", ipAddress: ip);
+                    return StatusCode(429, new { message = "Too many failed administrator login attempts. Please wait 5 minutes before trying again." });
+                }
+                else
+                {
+                    _adminRateLimit.TryRemove(rateKey, out _);
+                }
             }
 
-            var cleanMfa = req.MfaCode.Trim();
-            bool mfaValid = TotpHelper.VerifyCode(user.MfaSecretKey, cleanMfa);
-            if (!mfaValid)
+            if (req == null || string.IsNullOrWhiteSpace(req.AdministratorId) || string.IsNullOrWhiteSpace(req.Password))
+            {
+                return BadRequest(new { message = "Please enter both Administrator ID and password." });
+            }
+
+            var identifier = req.AdministratorId.Trim();
+            var user = await _userManager.FindByEmailAsync(identifier)
+                       ?? await _userManager.FindByNameAsync(identifier)
+                       ?? await _db.Users.FirstOrDefaultAsync(u =>
+                           u.NormalizedUserName == identifier.ToUpper() ||
+                           u.NormalizedEmail == identifier.ToUpper() ||
+                           (u.FullName != null && u.FullName.ToLower() == identifier.ToLower()));
+
+            // Constant-time mitigation delay (350ms) to resist timing attacks
+            await Task.Delay(350);
+
+            if (user == null || !user.IsActive)
             {
                 RecordFailedAdminAttempt(rateKey);
-                await _audit.RecordAsync(user.Id, user.UserName ?? identifier, AppRoles.Administrator, "Auth.AdminMfaFailed", "ApplicationUser", user.Id,
-                    $"Invalid MFA code submitted for administrator '{identifier}'.", ipAddress: ip);
-                return Unauthorized(new { message = "Invalid MFA verification code." });
+                await _audit.RecordAsync("UNKNOWN", identifier, AppRoles.Administrator, "Auth.AdminLoginFailed", "ApplicationUser", "unknown",
+                    $"Failed admin login attempt for '{identifier}'. Account not found or inactive.", ipAddress: ip);
+                return Unauthorized(new { message = "Invalid administrator credentials." });
             }
-        }
 
-        // Reset rate limiter on successful authentication
-        _adminRateLimit.TryRemove(rateKey, out _);
-
-        user.LastLoginAtUtc = DateTime.UtcNow;
-        await _userManager.UpdateAsync(user);
-
-        var token = GenerateJwtToken(user, AppRoles.Administrator, isAdminGateway: true);
-        var settings = await _db.CompanySettings.FirstOrDefaultAsync();
-        bool companySetupCompleted = settings?.CompanySetupCompleted ?? true;
-
-        await _audit.RecordAsync(
-            user.Id,
-            user.UserName ?? user.Email ?? "admin",
-            AppRoles.Administrator,
-            "Auth.AdminLoginSuccess",
-            "ApplicationUser",
-            user.Id,
-            $"Administrator '{user.FullName}' successfully authenticated through the Secure Admin Gateway.",
-            ipAddress: ip);
-
-        return Ok(new
-        {
-            token,
-            isAdminSession = true,
-            companySetupCompleted,
-            user = new
+            // Server-Side Strict Role Enforcement: Must have Administrator role
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!roles.Contains(AppRoles.Administrator))
             {
-                id = user.Id,
-                userName = user.UserName,
-                email = user.Email,
-                fullName = user.FullName,
-                department = user.Department,
-                role = AppRoles.Administrator,
-                isAdminSession = true,
-                mfaRequired = user.MfaRequired,
-                mfaConfigured = user.MfaConfigured,
-                companySetupCompleted
+                RecordFailedAdminAttempt(rateKey);
+                await _audit.RecordAsync(user.Id, user.UserName ?? identifier, user.RoleName, "Auth.AdminLoginFailed", "ApplicationUser", user.Id,
+                    $"Unauthorized admin gateway access attempted by non-admin account '{identifier}' with role '{user.RoleName}'. Access denied.", ipAddress: ip);
+                return Unauthorized(new { message = "Invalid administrator credentials." });
             }
-        });
+
+            var passwordAttempt = req.Password?.Trim() ?? string.Empty;
+            var result = await _signInManager.CheckPasswordSignInAsync(user, passwordAttempt, lockoutOnFailure: false);
+
+            if (result.IsLockedOut)
+            {
+                await _audit.RecordAsync(user.Id, user.UserName ?? identifier, AppRoles.Administrator, "Auth.AdminLockout", "ApplicationUser", user.Id,
+                    $"Administrator account '{identifier}' locked out due to multiple failed login attempts.", ipAddress: ip);
+                return StatusCode(423, new { message = "Administrator account is temporarily locked due to multiple failed login attempts. Please try again in 5 minutes." });
+            }
+
+            if (!result.Succeeded)
+            {
+                RecordFailedAdminAttempt(rateKey);
+                await _audit.RecordAsync(user.Id, user.UserName ?? identifier, AppRoles.Administrator, "Auth.AdminLoginFailed", "ApplicationUser", user.Id,
+                    $"Failed administrator password verification for '{identifier}'.", ipAddress: ip);
+                return Unauthorized(new { message = "Invalid administrator credentials." });
+            }
+
+            // MFA Verification for Administrator Access
+            if (user.MfaRequired || !string.IsNullOrWhiteSpace(req.MfaCode))
+            {
+                if (string.IsNullOrWhiteSpace(req.MfaCode))
+                {
+                    return Ok(new
+                    {
+                        mfaRequired = true,
+                        message = "Multi-Factor Authentication code is required for Administrator access."
+                    });
+                }
+
+                var cleanMfa = req.MfaCode.Trim();
+                bool mfaValid = TotpHelper.VerifyCode(user.MfaSecretKey, cleanMfa);
+                if (!mfaValid)
+                {
+                    RecordFailedAdminAttempt(rateKey);
+                    await _audit.RecordAsync(user.Id, user.UserName ?? identifier, AppRoles.Administrator, "Auth.AdminMfaFailed", "ApplicationUser", user.Id,
+                        $"Invalid MFA code submitted for administrator '{identifier}'.", ipAddress: ip);
+                    return Unauthorized(new { message = "Invalid MFA verification code." });
+                }
+            }
+
+            // Reset rate limiter on successful authentication
+            _adminRateLimit.TryRemove(rateKey, out _);
+
+            user.LastLoginAtUtc = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            var token = GenerateJwtToken(user, AppRoles.Administrator, isAdminGateway: true);
+            var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+            bool companySetupCompleted = settings?.CompanySetupCompleted ?? true;
+
+            await _audit.RecordAsync(
+                user.Id,
+                user.UserName ?? user.Email ?? "admin",
+                AppRoles.Administrator,
+                "Auth.AdminLoginSuccess",
+                "ApplicationUser",
+                user.Id,
+                $"Administrator '{user.FullName}' successfully authenticated through the Secure Admin Gateway.",
+                ipAddress: ip);
+
+            return Ok(new
+            {
+                token,
+                isAdminSession = true,
+                companySetupCompleted,
+                user = new
+                {
+                    id = user.Id,
+                    userName = user.UserName,
+                    email = user.Email,
+                    fullName = user.FullName,
+                    department = user.Department,
+                    role = AppRoles.Administrator,
+                    isAdminSession = true,
+                    mfaRequired = user.MfaRequired,
+                    mfaConfigured = user.MfaConfigured,
+                    companySetupCompleted
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[AdminLogin] Exception during administrator authentication: {ex}");
+            return StatusCode(500, new { message = "An error occurred during administrator authentication. Please check your credentials and try again." });
+        }
     }
 
     private static void RecordFailedAdminAttempt(string rateKey)
@@ -469,24 +526,7 @@ public class AuthController : ControllerBase
         }
 
         var result = await _signInManager.CheckPasswordSignInAsync(user, req.Password, lockoutOnFailure: false);
-        if (!result.Succeeded)
-        {
-            string? fallback = req.Password switch
-            {
-                "operator@12345" => "Operator@12345!",
-                "Operator@12345!" => "operator@12345",
-                "viewer@12345" => "Viewer@12345!",
-                "Viewer@12345!" => "viewer@12345",
-                "admin@12345" => "Admin@12345!",
-                "Admin@12345!" => "admin@12345",
-                _ => null
-            };
 
-            if (fallback != null)
-            {
-                result = await _signInManager.CheckPasswordSignInAsync(user, fallback, lockoutOnFailure: false);
-            }
-        }
 
         if (result.IsLockedOut)
         {

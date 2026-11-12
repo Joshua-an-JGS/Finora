@@ -20,29 +20,37 @@ public class AuditService
         string actorRole,
         string actionType,
         string entityType,
-        string entityId,
+        string? entityId,
         string summary,
         object? beforeValues = null,
         object? afterValues = null,
         string? ipAddress = null)
     {
-        var entry = new AuditLogEntry
+        try
         {
-            TimestampUtc = DateTime.UtcNow,
-            ActorUserId = actorUserId ?? "system",
-            ActorUserName = string.IsNullOrWhiteSpace(actorUserName) ? "System" : actorUserName,
-            ActorRole = string.IsNullOrWhiteSpace(actorRole) ? "System" : actorRole,
-            ActionType = actionType,
-            EntityType = entityType,
-            EntityId = entityId,
-            Summary = summary,
-            BeforeValuesJson = beforeValues != null ? JsonSerializer.Serialize(beforeValues) : null,
-            AfterValuesJson = afterValues != null ? JsonSerializer.Serialize(afterValues) : null,
-            IpAddress = ipAddress
-        };
+            var entry = new AuditLogEntry
+            {
+                TimestampUtc = DateTime.UtcNow,
+                ActorUserId = string.IsNullOrWhiteSpace(actorUserId) ? "system" : actorUserId,
+                ActorUserName = string.IsNullOrWhiteSpace(actorUserName) ? "System" : actorUserName,
+                ActorRole = string.IsNullOrWhiteSpace(actorRole) ? "System" : actorRole,
+                ActionType = string.IsNullOrWhiteSpace(actionType) ? "Audit" : actionType,
+                EntityType = string.IsNullOrWhiteSpace(entityType) ? "System" : entityType,
+                EntityId = string.IsNullOrWhiteSpace(entityId) ? "-" : entityId,
+                Summary = summary ?? string.Empty,
+                BeforeValuesJson = beforeValues != null ? JsonSerializer.Serialize(beforeValues) : null,
+                AfterValuesJson = afterValues != null ? JsonSerializer.Serialize(afterValues) : null,
+                IpAddress = ipAddress
+            };
 
-        _db.AuditLogEntries.Add(entry);
-        await _db.SaveChangesAsync();
+            _db.AuditLogEntries.Add(entry);
+            await _db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Resilient logging: audit recording should never break the caller
+            Console.Error.WriteLine($"[AuditService] Failed to record audit log: {ex.Message}");
+        }
     }
 
     public async Task<List<AuditLogEntry>> QueryAsync(string? actionFilter = null, string? search = null, int limit = 200)
