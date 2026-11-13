@@ -68,6 +68,8 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": true,
+      "include": "build/installer.nsh",
       "runAfterFinish": true,
       "artifactName": "FINORA_Setup.${ext}"
     }
