@@ -21,6 +21,8 @@ import {
   Eye,
   Check,
   X,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { apiRequest, getStoredToken } from '../services/api';
 import type {
@@ -120,6 +122,22 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
   const [archiveLoading, setArchiveLoading] = useState<boolean>(false);
   const [archiveYearFilter, setArchiveYearFilter] = useState<number | null>(null);
   const [archiveSearch, setArchiveSearch] = useState<string>('');
+  const [collapsedYears, setCollapsedYears] = useState<Record<number, boolean>>({});
+
+  const toggleYearCollapse = (y: number) => {
+    setCollapsedYears((prev) => ({
+      ...prev,
+      [y]: !prev[y],
+    }));
+  };
+
+  const toggleCollapseAll = (collapse: boolean) => {
+    const updated: Record<number, boolean> = {};
+    archiveData.forEach((yg) => {
+      updated[yg.year] = collapse;
+    });
+    setCollapsedYears(updated);
+  };
 
   // Safe file delete modal
   const [safeDeleteFile, setSafeDeleteFile] = useState<ArchiveFileItemDto | null>(null);
@@ -517,34 +535,57 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
               </div>
             </div>
 
-            {/* Year Filters */}
-            <div className="flex items-center gap-2 pt-1 border-t border-[#F3F4F6]">
-              <span className="text-[12px] font-medium text-[#6B7280]">Filter Year:</span>
-              <button
-                type="button"
-                onClick={() => setArchiveYearFilter(null)}
-                className={`px-3 py-1 rounded-[6px] text-[12px] font-semibold transition-all ${
-                  archiveYearFilter === null
-                    ? 'bg-[#F47721] text-[#FFFFFF]'
-                    : 'bg-[#F8F9FA] text-[#6B7280] hover:text-[#1F2937]'
-                }`}
-              >
-                All Years
-              </button>
-              {[2027, 2026, 2025].map((y) => (
+            {/* Year Filters & Global Collapse/Expand */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-[#F3F4F6]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[12px] font-medium text-[#6B7280]">Filter Year:</span>
                 <button
-                  key={y}
                   type="button"
-                  onClick={() => setArchiveYearFilter(y)}
+                  onClick={() => setArchiveYearFilter(null)}
                   className={`px-3 py-1 rounded-[6px] text-[12px] font-semibold transition-all ${
-                    archiveYearFilter === y
+                    archiveYearFilter === null
                       ? 'bg-[#F47721] text-[#FFFFFF]'
                       : 'bg-[#F8F9FA] text-[#6B7280] hover:text-[#1F2937]'
                   }`}
                 >
-                  {y}
+                  All Years
                 </button>
-              ))}
+                {Array.from(
+                  new Set([2028, 2027, 2026, 2025, ...archiveData.map((d) => d.year)])
+                )
+                  .sort((a, b) => b - a)
+                  .map((y) => (
+                    <button
+                      key={y}
+                      type="button"
+                      onClick={() => setArchiveYearFilter(y)}
+                      className={`px-3 py-1 rounded-[6px] text-[12px] font-semibold transition-all ${
+                        archiveYearFilter === y
+                          ? 'bg-[#F47721] text-[#FFFFFF]'
+                          : 'bg-[#F8F9FA] text-[#6B7280] hover:text-[#1F2937]'
+                      }`}
+                    >
+                      {y}
+                    </button>
+                  ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleCollapseAll(false)}
+                  className="px-2.5 py-1 rounded-[6px] text-[11.5px] font-semibold text-[#6B7280] hover:text-[#F47721] hover:bg-[#FFF3E8] border border-[#E5E7EB] transition-colors"
+                >
+                  Expand All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleCollapseAll(true)}
+                  className="px-2.5 py-1 rounded-[6px] text-[11.5px] font-semibold text-[#6B7280] hover:text-[#F47721] hover:bg-[#FFF3E8] border border-[#E5E7EB] transition-colors"
+                >
+                  Collapse All
+                </button>
+              </div>
             </div>
           </div>
 
@@ -559,22 +600,56 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
               No archived payroll records found for the selected filter.
             </div>
           ) : (
-            archiveData.map((yg) => (
-              <div
-                key={yg.year}
-                className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-5 space-y-4"
-              >
-                <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-[18px] font-bold text-[#1F2937]">{yg.year}</span>
-                    <span className="text-[11.5px] px-2 py-0.5 rounded-[5px] bg-[#FFF3E8] text-[#F47721] font-semibold">
-                      {yg.months.filter((m) => m.isImported).length} of 12 Months Imported
-                    </span>
+            archiveData.map((yg) => {
+              const isCollapsed = Boolean(collapsedYears[yg.year]);
+              return (
+                <div
+                  key={yg.year}
+                  className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-5 space-y-4 transition-all"
+                >
+                  <div
+                    onClick={() => toggleYearCollapse(yg.year)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleYearCollapse(yg.year);
+                      }
+                    }}
+                    className={`flex items-center justify-between cursor-pointer select-none transition-colors group ${
+                      isCollapsed ? '' : 'border-b border-[#F3F4F6] pb-3'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[18px] font-bold text-[#1F2937] group-hover:text-[#F47721] transition-colors">
+                        {yg.year}
+                      </span>
+                      <span className="text-[11.5px] px-2 py-0.5 rounded-[5px] bg-[#FFF3E8] text-[#F47721] font-semibold">
+                        {yg.months.filter((m) => m.isImported).length} of 12 Months Imported
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <span className="text-[12px] text-[#6B7280] hidden sm:inline">
+                        Storage Directory:{' '}
+                        <code className="font-mono text-[#1F2937]">
+                          FINORA_DATA/Payroll_Archive/{yg.year}/
+                        </code>
+                      </span>
+                      <div className="flex items-center gap-1 text-[12px] font-semibold text-[#6B7280] group-hover:text-[#F47721] bg-[#F8F9FA] group-hover:bg-[#FFF3E8] px-2.5 py-1 rounded-[6px] border border-[#E5E7EB] transition-colors">
+                        <span>{isCollapsed ? 'Expand' : 'Collapse'}</span>
+                        {isCollapsed ? (
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[12px] text-[#6B7280]">
-                    Storage Directory: <code className="font-mono text-[#1F2937]">FINORA_DATA/Payroll_Archive/{yg.year}/</code>
-                  </span>
-                </div>
+
+                  {!isCollapsed && (
+                    <>
 
                 {/* 12 Months Grid */}
                 <div>
@@ -627,103 +702,106 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                   </div>
                 </div>
 
-                {/* Archived Files Table */}
-                {yg.archivedFiles.length > 0 && (
-                  <div className="pt-2">
-                    <h4 className="text-[12.5px] font-semibold text-[#6B7280] uppercase tracking-wider mb-2.5">
-                      Archived Original Excel Files ({yg.archivedFiles.length})
-                    </h4>
-                    <div className="overflow-x-auto border border-[#E5E7EB] rounded-[8px]">
-                      <table className="w-full text-left border-collapse text-[12px]">
-                        <thead>
-                          <tr className="bg-[#F8F9FA] border-b border-[#E5E7EB] text-[#6B7280]">
-                            <th className="py-2 px-3 font-semibold">Original File Name</th>
-                            <th className="py-2 px-3 font-semibold">Mode & Periods</th>
-                            <th className="py-2 px-3 font-semibold">Import Date & User</th>
-                            <th className="py-2 px-3 font-semibold">File Retention</th>
-                            <th className="py-2 px-3 font-semibold text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB]">
-                          {yg.archivedFiles.map((f) => (
-                            <tr key={f.importBatchId} className="hover:bg-[#F8F9FA]">
-                              <td className="py-2.5 px-3">
-                                <div className="font-semibold text-[#1F2937] flex items-center gap-1.5">
-                                  <FileSpreadsheet className="w-4 h-4 text-[#F47721] shrink-0" />
-                                  <span>{f.fileName}</span>
-                                </div>
-                                <div className="text-[10.5px] text-[#9CA3AF] font-mono mt-0.5">
-                                  SHA-256: {f.fileSha256 ? f.fileSha256.substring(0, 16) + '...' : 'N/A'}
-                                </div>
-                              </td>
-                              <td className="py-2.5 px-3">
-                                <span className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[#F3F4F6] text-[#4B5563] text-[10.5px] font-medium mr-1 mb-1">
-                                  {f.importMode || 'SingleMonth'}
-                                </span>
-                                <div className="text-[11px] text-[#6B7280]">
-                                  {f.detectedPeriods && f.detectedPeriods.length > 0
-                                    ? f.detectedPeriods.join(', ')
-                                    : 'Period verified'}
-                                </div>
-                              </td>
-                              <td className="py-2.5 px-3 text-[#6B7280]">
-                                <div>{new Date(f.importDateUtc).toLocaleDateString()}</div>
-                                <div className="text-[11px] text-[#9CA3AF]">{f.importedBy}</div>
-                              </td>
-                              <td className="py-2.5 px-3">
-                                {f.sourceFileRetentionStatus === 'Retained' && f.physicalFileExists ? (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#16A34A] bg-[#DCFCE7] px-2 py-0.5 rounded-[4px]">
-                                    <Check className="w-3 h-3" /> Retained On Disk
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-[4px]">
-                                    <AlertTriangle className="w-3 h-3" /> File Removed (Records Intact)
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2.5 px-3 text-right">
-                                <div className="inline-flex items-center gap-1.5">
-                                  {f.sourceFileRetentionStatus === 'Retained' && f.physicalFileExists && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDownloadArchivedFile(f)}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[5px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#F47721] text-[#1F2937] text-[11.5px] font-medium"
-                                        title="Download original imported Excel file"
-                                      >
-                                        <Download className="w-3 h-3 text-[#F47721]" />
-                                        <span>Download</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setSafeDeleteFile(f)}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[5px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#DC2626] text-[#DC2626] text-[11.5px] font-medium"
-                                        title="Delete source file from disk (preserves all payroll records)"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                        <span>Delete File</span>
-                                      </button>
-                                    </>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCheckBatchSafetyAndOpenModal(f)}
-                                    className="p-1 rounded-[5px] text-[#9CA3AF] hover:text-[#DC2626] hover:bg-[#FEE2E2]"
-                                    title="Remove Batch (Admin Only)"
-                                  >
-                                    <ShieldAlert className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
+                      {/* Archived Files Table */}
+                      {yg.archivedFiles.length > 0 && (
+                        <div className="pt-2">
+                          <h4 className="text-[12.5px] font-semibold text-[#6B7280] uppercase tracking-wider mb-2.5">
+                            Archived Original Excel Files ({yg.archivedFiles.length})
+                          </h4>
+                          <div className="overflow-x-auto border border-[#E5E7EB] rounded-[8px]">
+                            <table className="w-full text-left border-collapse text-[12px]">
+                              <thead>
+                                <tr className="bg-[#F8F9FA] border-b border-[#E5E7EB] text-[#6B7280]">
+                                  <th className="py-2 px-3 font-semibold">Original File Name</th>
+                                  <th className="py-2 px-3 font-semibold">Mode & Periods</th>
+                                  <th className="py-2 px-3 font-semibold">Import Date & User</th>
+                                  <th className="py-2 px-3 font-semibold">File Retention</th>
+                                  <th className="py-2 px-3 font-semibold text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#E5E7EB]">
+                                {yg.archivedFiles.map((f) => (
+                                  <tr key={f.importBatchId} className="hover:bg-[#F8F9FA]">
+                                    <td className="py-2.5 px-3">
+                                      <div className="font-semibold text-[#1F2937] flex items-center gap-1.5">
+                                        <FileSpreadsheet className="w-4 h-4 text-[#F47721] shrink-0" />
+                                        <span>{f.fileName}</span>
+                                      </div>
+                                      <div className="text-[10.5px] text-[#9CA3AF] font-mono mt-0.5">
+                                        SHA-256: {f.fileSha256 ? f.fileSha256.substring(0, 16) + '...' : 'N/A'}
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="inline-block px-1.5 py-0.5 rounded-[4px] bg-[#F3F4F6] text-[#4B5563] text-[10.5px] font-medium mr-1 mb-1">
+                                        {f.importMode || 'SingleMonth'}
+                                      </span>
+                                      <div className="text-[11px] text-[#6B7280]">
+                                        {f.detectedPeriods && f.detectedPeriods.length > 0
+                                          ? f.detectedPeriods.join(', ')
+                                          : 'Period verified'}
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-[#6B7280]">
+                                      <div>{new Date(f.importDateUtc).toLocaleDateString()}</div>
+                                      <div className="text-[11px] text-[#9CA3AF]">{f.importedBy}</div>
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      {f.sourceFileRetentionStatus === 'Retained' && f.physicalFileExists ? (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#16A34A] bg-[#DCFCE7] px-2 py-0.5 rounded-[4px]">
+                                          <Check className="w-3 h-3" /> Retained On Disk
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-[4px]">
+                                          <AlertTriangle className="w-3 h-3" /> File Removed (Records Intact)
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right">
+                                      <div className="inline-flex items-center gap-1.5">
+                                        {f.sourceFileRetentionStatus === 'Retained' && f.physicalFileExists && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDownloadArchivedFile(f)}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[5px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#F47721] text-[#1F2937] text-[11.5px] font-medium"
+                                              title="Download original imported Excel file"
+                                            >
+                                              <Download className="w-3 h-3 text-[#F47721]" />
+                                              <span>Download</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setSafeDeleteFile(f)}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[5px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#DC2626] text-[#DC2626] text-[11.5px] font-medium"
+                                              title="Delete source file from disk (preserves all payroll records)"
+                                            >
+                                              <Trash2 className="w-3 h-3" />
+                                              <span>Delete File</span>
+                                            </button>
+                                          </>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCheckBatchSafetyAndOpenModal(f)}
+                                          className="p-1 rounded-[5px] text-[#9CA3AF] hover:text-[#DC2626] hover:bg-[#FEE2E2]"
+                                          title="Remove Batch (Admin Only)"
+                                        >
+                                          <ShieldAlert className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       ) : (
