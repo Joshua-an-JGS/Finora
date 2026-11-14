@@ -73,7 +73,7 @@ export const DashboardView: React.FC<{
     setLoading(true);
     apiRequest(`/api/dashboard?month=${activeMonth}&year=${activeYear}`)
       .then(setData)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   };
 
@@ -378,7 +378,7 @@ export const EmployeeDirectoryView: React.FC<{
     setLoading(true);
     apiRequest<any[]>(`/api/employees?search=${encodeURIComponent(search)}`)
       .then(setEmployees)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [search]);
 
@@ -491,7 +491,7 @@ export const MonthlyPayrollView: React.FC<{
       try {
         const d = await getPayrollYears();
         if (d.availableYears?.length > 0) setMonthlyYears(d.availableYears);
-      } catch {}
+      } catch { }
     };
     loadYears();
     return onYearsUpdated(loadYears);
@@ -505,7 +505,7 @@ export const MonthlyPayrollView: React.FC<{
       )}`
     )
       .then(setData)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [activeMonth, activeYear, search]);
 
@@ -694,11 +694,10 @@ const TemplateLayoutThumbnail: React.FC<{
 
   return (
     <div
-      className={`w-[60px] h-[52px] rounded-[6px] border p-1 flex flex-col justify-between shrink-0 select-none transition-all ${
-        isDefault
-          ? 'bg-[#FFFDF9] border-[#FED7AA]'
-          : 'bg-[#F8F9FA] border-[#E5E7EB]'
-      }`}
+      className={`w-[60px] h-[52px] rounded-[6px] border p-1 flex flex-col justify-between shrink-0 select-none transition-all ${isDefault
+        ? 'bg-[#FFFDF9] border-[#FED7AA]'
+        : 'bg-[#F8F9FA] border-[#E5E7EB]'
+        }`}
       title={isSideBySide ? 'Side-by-Side Dual Column Layout' : 'Stacked Single Column Layout'}
     >
       {/* Mini Header Bar */}
@@ -781,7 +780,7 @@ export const PayslipTemplatesView: React.FC<{ canEdit: boolean }> = ({ canEdit }
   const loadTemplates = () => {
     apiRequest<PayslipTemplateItem[]>(`/api/templates/payslip?includeArchived=${includeArchived}`)
       .then(setTemplates)
-      .catch(() => {});
+      .catch(() => { });
   };
 
   useEffect(() => {
@@ -883,11 +882,10 @@ export const PayslipTemplatesView: React.FC<{ canEdit: boolean }> = ({ canEdit }
                 type="button"
                 onClick={handleCreate}
                 disabled={!newName.trim()}
-                className={`w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-[7px] text-[13px] font-semibold transition-colors ${
-                  newName.trim()
-                    ? 'bg-[#F47721] text-[#FFFFFF] hover:bg-[#E06612] cursor-pointer'
-                    : 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed border border-[#E5E7EB]'
-                }`}
+                className={`w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-[7px] text-[13px] font-semibold transition-colors ${newName.trim()
+                  ? 'bg-[#F47721] text-[#FFFFFF] hover:bg-[#E06612] cursor-pointer'
+                  : 'bg-[#F3F4F6] text-[#9CA3AF] cursor-not-allowed border border-[#E5E7EB]'
+                  }`}
               >
                 <Plus className="w-4 h-4" />
                 <span>Create Template</span>
@@ -1224,11 +1222,10 @@ export const PayslipTemplatesView: React.FC<{ canEdit: boolean }> = ({ canEdit }
         {templates.map((t) => (
           <div
             key={t.id}
-            className={`bg-[#FFFFFF] border rounded-[10px] p-5 flex flex-col justify-between space-y-4 transition-all hover:shadow-sm ${
-              t.isDefault
-                ? 'border-[#F47721] ring-1 ring-[#F47721]/30 shadow-xs'
-                : 'border-[#E5E7EB] hover:border-[#D1D5DB]'
-            }`}
+            className={`bg-[#FFFFFF] border rounded-[10px] p-5 flex flex-col justify-between space-y-4 transition-all hover:shadow-sm ${t.isDefault
+              ? 'border-[#F47721] ring-1 ring-[#F47721]/30 shadow-xs'
+              : 'border-[#E5E7EB] hover:border-[#D1D5DB]'
+              }`}
           >
             <div className="space-y-3">
               {/* A. Card Header: Title + Badges */}
@@ -1294,9 +1291,8 @@ export const PayslipTemplatesView: React.FC<{ canEdit: boolean }> = ({ canEdit }
                     <span>Zero Values</span>
                   </span>
                   <span
-                    className={`font-semibold ${
-                      t.config.showZeroValueRows ? 'text-[#F47721]' : 'text-[#6B7280]'
-                    }`}
+                    className={`font-semibold ${t.config.showZeroValueRows ? 'text-[#F47721]' : 'text-[#6B7280]'
+                      }`}
                   >
                     {t.config.showZeroValueRows ? 'Visible' : 'Hidden'}
                   </span>
@@ -1466,11 +1462,10 @@ export const EmailTemplatesView: React.FC<{ canEdit: boolean }> = ({ canEdit }) 
               <div
                 key={t.id}
                 onClick={() => selectItem(t)}
-                className={`p-3 rounded-[8px] border cursor-pointer text-[13px] ${
-                  selected?.id === t.id
-                    ? 'border-[#F47721] bg-[#FFF3E8]/50'
-                    : 'border-[#E5E7EB] hover:bg-[#F8F9FA]'
-                }`}
+                className={`p-3 rounded-[8px] border cursor-pointer text-[13px] ${selected?.id === t.id
+                  ? 'border-[#F47721] bg-[#FFF3E8]/50'
+                  : 'border-[#E5E7EB] hover:bg-[#F8F9FA]'
+                  }`}
               >
                 <div className="flex items-center justify-between font-semibold text-[#1F2937]">
                   <span>{t.name}</span>
@@ -1584,7 +1579,7 @@ export const SentHistoryView: React.FC<{ canEdit: boolean }> = ({ canEdit }) => 
       )}`
     )
       .then(setItems)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   };
 
@@ -1916,13 +1911,12 @@ export const ReportsAndExportsView: React.FC<{
 
       {feedback && (
         <div
-          className={`p-3.5 rounded-[8px] text-[13px] border flex items-center justify-between ${
-            feedback.type === 'success'
-              ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
-              : feedback.type === 'error'
+          className={`p-3.5 rounded-[8px] text-[13px] border flex items-center justify-between ${feedback.type === 'success'
+            ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
+            : feedback.type === 'error'
               ? 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
               : 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]'
-          }`}
+            }`}
         >
           <span>{feedback.message}</span>
           <button
@@ -1986,20 +1980,18 @@ export const ReportsAndExportsView: React.FC<{
                       setExportMode('fullYear');
                     }
                   }}
-                  className={`px-4 py-2 rounded-[7px] text-[13px] font-semibold border transition-all flex items-center gap-2 ${
-                    isSelected
-                      ? 'bg-[#F47721] text-[#FFFFFF] border-[#F47721] shadow-xs'
-                      : 'bg-[#FFFFFF] text-[#374151] border-[#D1D5DB] hover:border-[#F47721] hover:text-[#F47721]'
-                  }`}
+                  className={`px-4 py-2 rounded-[7px] text-[13px] font-semibold border transition-all flex items-center gap-2 ${isSelected
+                    ? 'bg-[#F47721] text-[#FFFFFF] border-[#F47721] shadow-xs'
+                    : 'bg-[#FFFFFF] text-[#374151] border-[#D1D5DB] hover:border-[#F47721] hover:text-[#F47721]'
+                    }`}
                 >
                   <Calendar className="w-3.5 h-3.5" />
                   <span>{yr}</span>
                   <span
-                    className={`text-[11px] px-1.5 py-0.2 rounded font-normal ${
-                      isSelected
-                        ? 'bg-[#FFFFFF]/25 text-[#FFFFFF]'
-                        : 'bg-[#F3F4F6] text-[#6B7280]'
-                    }`}
+                    className={`text-[11px] px-1.5 py-0.2 rounded font-normal ${isSelected
+                      ? 'bg-[#FFFFFF]/25 text-[#FFFFFF]'
+                      : 'bg-[#F3F4F6] text-[#6B7280]'
+                      }`}
                   >
                     {mCount} mo
                   </span>
@@ -2019,11 +2011,10 @@ export const ReportsAndExportsView: React.FC<{
             <button
               type="button"
               onClick={() => setExportMode('fullYear')}
-              className={`p-4 rounded-[8px] border text-left transition-all ${
-                exportMode === 'fullYear'
-                  ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
-                  : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
-              }`}
+              className={`p-4 rounded-[8px] border text-left transition-all ${exportMode === 'fullYear'
+                ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
+                : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
+                }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-bold text-[14px] text-[#1F2937]">Full Year Export</span>
@@ -2038,11 +2029,10 @@ export const ReportsAndExportsView: React.FC<{
             <button
               type="button"
               onClick={() => setExportMode('selectedMonths')}
-              className={`p-4 rounded-[8px] border text-left transition-all ${
-                exportMode === 'selectedMonths'
-                  ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
-                  : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
-              }`}
+              className={`p-4 rounded-[8px] border text-left transition-all ${exportMode === 'selectedMonths'
+                ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
+                : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
+                }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-bold text-[14px] text-[#1F2937]">Selected Months Export</span>
@@ -2057,11 +2047,10 @@ export const ReportsAndExportsView: React.FC<{
             <button
               type="button"
               onClick={() => setExportMode('allYearsZip')}
-              className={`p-4 rounded-[8px] border text-left transition-all ${
-                exportMode === 'allYearsZip'
-                  ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
-                  : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
-              }`}
+              className={`p-4 rounded-[8px] border text-left transition-all ${exportMode === 'allYearsZip'
+                ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
+                : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
+                }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-bold text-[14px] text-[#1F2937]">All Years ZIP Archive</span>
@@ -2157,20 +2146,19 @@ export const ReportsAndExportsView: React.FC<{
                           setSelectedMonths((prev) => [...prev, m.month]);
                         }
                       }}
-                      className={`p-2.5 rounded-[7px] border text-left transition-all ${
-                        !hasData
-                          ? 'bg-[#F3F4F6] border-[#E5E7EB] opacity-60 cursor-not-allowed'
-                          : isChecked
+                      className={`p-2.5 rounded-[7px] border text-left transition-all ${!hasData
+                        ? 'bg-[#F3F4F6] border-[#E5E7EB] opacity-60 cursor-not-allowed'
+                        : isChecked
                           ? 'bg-[#FFFFFF] border-[#F47721] shadow-xs cursor-pointer ring-1 ring-[#F47721]'
                           : 'bg-[#FFFFFF] border-[#D1D5DB] hover:border-[#9CA3AF] cursor-pointer'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <input
                           type="checkbox"
                           disabled={!hasData}
                           checked={isChecked}
-                          onChange={() => {}} // handled by parent onClick
+                          onChange={() => { }} // handled by parent onClick
                           className="rounded text-[#F47721] focus:ring-[#F47721]"
                         />
                         <span className="font-semibold text-[12.5px] text-[#1F2937]">
@@ -2234,18 +2222,17 @@ export const ReportsAndExportsView: React.FC<{
                           setSelectedZipYears((prev) => [...prev, yr]);
                         }
                       }}
-                      className={`p-3.5 rounded-[8px] border cursor-pointer transition-all ${
-                        isChecked
-                          ? 'bg-[#FFFFFF] border-[#F47721] ring-1 ring-[#F47721] shadow-xs'
-                          : 'bg-[#FFFFFF] border-[#D1D5DB] hover:border-[#9CA3AF]'
-                      }`}
+                      className={`p-3.5 rounded-[8px] border cursor-pointer transition-all ${isChecked
+                        ? 'bg-[#FFFFFF] border-[#F47721] ring-1 ring-[#F47721] shadow-xs'
+                        : 'bg-[#FFFFFF] border-[#D1D5DB] hover:border-[#9CA3AF]'
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="font-bold text-[15px] text-[#1F2937]">{yr}</span>
                         <input
                           type="checkbox"
                           checked={isChecked}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="rounded text-[#F47721] focus:ring-[#F47721]"
                         />
                       </div>
@@ -2314,11 +2301,10 @@ export const ReportsAndExportsView: React.FC<{
             type="button"
             disabled={!canDownload}
             onClick={handleDownload}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-[7px] text-[13.5px] font-bold transition-all shadow-xs ${
-              canDownload
-                ? 'bg-[#F47721] text-[#FFFFFF] hover:bg-[#E06612] cursor-pointer'
-                : 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
-            }`}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-[7px] text-[13.5px] font-bold transition-all shadow-xs ${canDownload
+              ? 'bg-[#F47721] text-[#FFFFFF] hover:bg-[#E06612] cursor-pointer'
+              : 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
+              }`}
           >
             <FileDown className="w-4 h-4" />
             <span>
@@ -2345,11 +2331,10 @@ export const ReportsAndExportsView: React.FC<{
             <button
               type="button"
               onClick={() => setArchiveFilterYear('all')}
-              className={`px-3 py-1 rounded-[5px] text-[12px] font-semibold transition-all ${
-                archiveFilterYear === 'all'
-                  ? 'bg-[#FFFFFF] text-[#1F2937] shadow-xs'
-                  : 'text-[#6B7280] hover:text-[#1F2937]'
-              }`}
+              className={`px-3 py-1 rounded-[5px] text-[12px] font-semibold transition-all ${archiveFilterYear === 'all'
+                ? 'bg-[#FFFFFF] text-[#1F2937] shadow-xs'
+                : 'text-[#6B7280] hover:text-[#1F2937]'
+                }`}
             >
               All Years
             </button>
@@ -2358,11 +2343,10 @@ export const ReportsAndExportsView: React.FC<{
                 key={yr}
                 type="button"
                 onClick={() => setArchiveFilterYear(yr)}
-                className={`px-3 py-1 rounded-[5px] text-[12px] font-semibold transition-all ${
-                  archiveFilterYear === yr
-                    ? 'bg-[#FFFFFF] text-[#F47721] shadow-xs'
-                    : 'text-[#6B7280] hover:text-[#1F2937]'
-                }`}
+                className={`px-3 py-1 rounded-[5px] text-[12px] font-semibold transition-all ${archiveFilterYear === yr
+                  ? 'bg-[#FFFFFF] text-[#F47721] shadow-xs'
+                  : 'text-[#6B7280] hover:text-[#1F2937]'
+                  }`}
               >
                 {yr}
               </button>
@@ -2818,11 +2802,10 @@ export const UserManagementView: React.FC<{
       {/* Global Feedback Banner */}
       {feedback && (
         <div
-          className={`p-3.5 rounded-[8px] border text-[13px] flex items-center justify-between ${
-            feedback.type === 'success'
-              ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
-              : 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
-          }`}
+          className={`p-3.5 rounded-[8px] border text-[13px] flex items-center justify-between ${feedback.type === 'success'
+            ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
+            : 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
+            }`}
         >
           <div className="flex items-center gap-2 font-medium">
             {feedback.type === 'success' ? (
@@ -2977,9 +2960,8 @@ export const UserManagementView: React.FC<{
                             e.stopPropagation();
                             setActiveMenuUserId(isMenuOpen ? null : u.id);
                           }}
-                          className={`p-1.5 rounded-[6px] hover:bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937] transition-colors border ${
-                            isMenuOpen ? 'bg-[#F3F4F6] border-[#D1D5DB]' : 'border-transparent'
-                          }`}
+                          className={`p-1.5 rounded-[6px] hover:bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937] transition-colors border ${isMenuOpen ? 'bg-[#F3F4F6] border-[#D1D5DB]' : 'border-transparent'
+                            }`}
                           title="Member Actions"
                         >
                           <MoreVertical className="w-4 h-4" />
@@ -3448,11 +3430,10 @@ export const UserManagementView: React.FC<{
                 type="button"
                 disabled={statusSubmitting}
                 onClick={handleConfirmStatusToggle}
-                className={`px-4 py-2 rounded-[7px] font-semibold text-white shadow-sm transition-colors flex items-center gap-2 ${
-                  statusDialogUser.isActive
-                    ? 'bg-[#F47721] hover:bg-[#E06612]'
-                    : 'bg-[#10B981] hover:bg-[#059669]'
-                }`}
+                className={`px-4 py-2 rounded-[7px] font-semibold text-white shadow-sm transition-colors flex items-center gap-2 ${statusDialogUser.isActive
+                  ? 'bg-[#F47721] hover:bg-[#E06612]'
+                  : 'bg-[#10B981] hover:bg-[#059669]'
+                  }`}
               >
                 {statusSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                 <span>{statusDialogUser.isActive ? 'Deactivate' : 'Activate'}</span>
@@ -3742,7 +3723,7 @@ export const AuditLogView: React.FC = () => {
       )}`
     )
       .then(setEntries)
-      .catch(() => {});
+      .catch(() => { });
   }, [actionFilter, search]);
 
   return (
@@ -3837,8 +3818,8 @@ export const SettingsView: React.FC<{
     autoDownloadUpdates: false,
     notifyBeforeInstall: true,
     updateChannel: 'Stable',
-    currentVersion: '1.0.2',
-    availableVersion: '1.0.2',
+    currentVersion: '1.0.3',
+    availableVersion: '1.0.3',
     lastCheckedAtUtc: null,
     lastInstalledAtUtc: null,
   });
@@ -3855,7 +3836,7 @@ export const SettingsView: React.FC<{
           setUpdateConfig((prev: any) => ({ ...prev, ...u }));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleCheckUpdatesInSettings = async () => {
@@ -3879,7 +3860,7 @@ export const SettingsView: React.FC<{
         setUpdateMsg({ ok: true, text: `Update available: v${res.latestVersion}. Ready to download.`, available: true, newVersion: res.latestVersion });
       } else {
         setUpdateConfig((prev: any) => ({ ...prev, lastCheckedAtUtc: res.lastCheckedAtUtc }));
-        setUpdateMsg({ ok: true, text: `FINORA is up to date. You are running the latest version (v${res.currentVersion || '1.0.2'}).` });
+        setUpdateMsg({ ok: true, text: `FINORA is up to date. You are running the latest version (v${res.currentVersion || '1.0.3'}).` });
       }
     } catch {
       setUpdateMsg({ ok: false, text: 'Unable to check for updates. Please check your internet connection and try again.' });
@@ -3928,7 +3909,7 @@ export const SettingsView: React.FC<{
           smtpUsername: s.smtpUsername || fromAddr,
         });
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   if (!form) return null;
@@ -3969,7 +3950,7 @@ export const SettingsView: React.FC<{
             updateServerUrl: updateConfig.updateServerUrl,
           }),
         });
-      } catch {}
+      } catch { }
     }
     setForm(updated);
     setNewSmtpPassword('');
@@ -4179,11 +4160,10 @@ export const SettingsView: React.FC<{
                     smtpPort: 587,
                   })
                 }
-                className={`px-2.5 py-1 rounded-[6px] text-[11.5px] font-semibold border ${
-                  form.smtpHost === 'smtp.gmail.com'
-                    ? 'bg-[#FFF3E8] border-[#F47721] text-[#F47721]'
-                    : 'bg-[#FFFFFF] border-[#E5E7EB] text-[#6B7280]'
-                }`}
+                className={`px-2.5 py-1 rounded-[6px] text-[11.5px] font-semibold border ${form.smtpHost === 'smtp.gmail.com'
+                  ? 'bg-[#FFF3E8] border-[#F47721] text-[#F47721]'
+                  : 'bg-[#FFFFFF] border-[#E5E7EB] text-[#6B7280]'
+                  }`}
               >
                 Google Workspace / Gmail
               </button>
@@ -4197,11 +4177,10 @@ export const SettingsView: React.FC<{
                     smtpPort: 587,
                   })
                 }
-                className={`px-2.5 py-1 rounded-[6px] text-[11.5px] font-semibold border ${
-                  form.smtpHost === 'smtp.office365.com'
-                    ? 'bg-[#FFF3E8] border-[#F47721] text-[#F47721]'
-                    : 'bg-[#FFFFFF] border-[#E5E7EB] text-[#6B7280]'
-                }`}
+                className={`px-2.5 py-1 rounded-[6px] text-[11.5px] font-semibold border ${form.smtpHost === 'smtp.office365.com'
+                  ? 'bg-[#FFF3E8] border-[#F47721] text-[#F47721]'
+                  : 'bg-[#FFFFFF] border-[#E5E7EB] text-[#6B7280]'
+                  }`}
               >
                 Microsoft 365 / Outlook
               </button>
@@ -4334,11 +4313,10 @@ export const SettingsView: React.FC<{
           </div>
           {smtpTestResult && (
             <div
-              className={`p-2.5 rounded-[6px] text-[12px] font-medium ${
-                smtpTestResult.ok
-                  ? 'bg-[#FFF3E8] border border-[#F47721]/40 text-[#1F2937]'
-                  : 'bg-[#FFF3E8] border border-[#F47721] text-[#F47721]'
-              }`}
+              className={`p-2.5 rounded-[6px] text-[12px] font-medium ${smtpTestResult.ok
+                ? 'bg-[#FFF3E8] border border-[#F47721]/40 text-[#1F2937]'
+                : 'bg-[#FFF3E8] border border-[#F47721] text-[#F47721]'
+                }`}
             >
               {smtpTestResult.text}
             </div>
@@ -4438,11 +4416,10 @@ export const SettingsView: React.FC<{
 
           {/* Update Result Message */}
           {updateMsg && (
-            <div className={`p-3.5 rounded-[8px] text-[12.5px] font-medium flex items-center justify-between gap-3 ${
-              updateMsg.ok
-                ? 'bg-[#FFF3E8] border border-[#F47721]/30 text-[#1F2937]'
-                : 'bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B]'
-            }`}>
+            <div className={`p-3.5 rounded-[8px] text-[12.5px] font-medium flex items-center justify-between gap-3 ${updateMsg.ok
+              ? 'bg-[#FFF3E8] border border-[#F47721]/30 text-[#1F2937]'
+              : 'bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B]'
+              }`}>
               <div className="flex items-center gap-2">
                 {updateMsg.ok ? (
                   <CheckCircle2 className="w-4 h-4 text-[#F47721] shrink-0" />
@@ -4527,7 +4504,7 @@ export const SettingsView: React.FC<{
             </div>
             <div className="p-3 rounded-[7px] bg-[#F9FAFB] border border-[#E5E7EB]">
               <div className="text-[#6B7280] text-[11px] font-medium uppercase tracking-wider">System Version</div>
-              <div className="text-[#1F2937] font-semibold text-[13px] mt-0.5">v{updateConfig.currentVersion || '1.0.2'} Enterprise</div>
+              <div className="text-[#1F2937] font-semibold text-[13px] mt-0.5">v{updateConfig.currentVersion || '1.0.3'} Enterprise</div>
               <div className="text-[#6B7280] text-[11px] mt-0.5">.NET 10.0 Web API · React 19 · PostgreSQL</div>
             </div>
             <div className="p-3 rounded-[7px] bg-[#F9FAFB] border border-[#E5E7EB]">

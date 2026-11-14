@@ -22,9 +22,9 @@ public class UpdateController : ControllerBase
     private readonly IConfiguration _config;
     private readonly AuditService _audit;
 
-    public const string CurrentApplicationVersion = "1.0.2";
-    public const string BuildIdentifier = "2026.11.05-prod.x64";
-    public const string ReleaseDateString = "November 5, 2026";
+    public const string CurrentApplicationVersion = "1.0.3";
+    public const string BuildIdentifier = "2026.11.14-prod.x64";
+    public const string ReleaseDateString = "November 14, 2026";
 
     public UpdateController(
         ApplicationDbContext db,
@@ -224,10 +224,38 @@ public class UpdateController : ControllerBase
         {
             new
             {
+                version = "1.0.3",
+                releaseDate = "November 14, 2026",
+                releaseType = "Feature & Quality Release",
+                isCurrent = true,
+                summary = "FINORA System Release: Smart Excel Import with Multi-Period modes, Year-Wise Master Export Centre, Dynamic Payroll Year Management, Redesigned Payslip Templates, and Default FINORA Branding.",
+                newFeatures = new[]
+                {
+                    "Smart Excel Import with 4 flexible modes: Single Month, Full Year, Multiple Months, and Auto-Detect from Excel workbook data",
+                    "Master Payroll Export Centre: Export organized payroll records by year with separate monthly worksheets and ZIP archive downloads",
+                    "Centralized Dynamic Payroll Year Service: Automatic discovery of all active payroll periods across the entire application without hardcoded year limits",
+                    "Redesigned Payslip Templates Library: Compact cards with layout preview thumbnails, single-sentence descriptions, and streamlined action hierarchy",
+                    "Default FINORA Brand Logo: Pre-seeded official FINORA branding for new and existing setups with seamless custom logo upload and reset capabilities"
+                },
+                improvements = new[]
+                {
+                    "Fixed sidebar layout with independent workspace scrolling for a stable desktop experience",
+                    "Refined UI aesthetics across badges, avatar indicators, and status chips",
+                    "Seamless year-wise archive browsing with collapsible/expandable yearly cards and direct folder access"
+                },
+                bugFixes = new[]
+                {
+                    "Resolved hardcoded year list restricting years beyond 2027",
+                    "Resolved sidebar member count displaying 3 when only 1 administrator existed",
+                    "Fixed text clipping in payslip header logo fallback"
+                }
+            },
+            new
+            {
                 version = "1.0.2",
                 releaseDate = "November 5, 2026",
                 releaseType = "Maintenance & Enhancements Update",
-                isCurrent = true,
+                isCurrent = false,
                 summary = "FINORA System Update: Payslip deductions table formatting optimization, dedicated contact phone field, and interactive company website hyperlinks.",
                 newFeatures = new[]
                 {

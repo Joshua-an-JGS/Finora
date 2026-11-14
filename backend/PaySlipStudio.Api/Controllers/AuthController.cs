@@ -89,7 +89,7 @@ public class AuthController : ControllerBase
                 isInitialized = !isSetupRequired,
                 adminCount = admins.Count,
                 companySetupCompleted = settings?.CompanySetupCompleted ?? false,
-                systemVersion = "1.0.2",
+                systemVersion = "1.0.3",
                 appName = "FINORA"
             });
         }
