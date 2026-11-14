@@ -37,7 +37,9 @@
         "from": "backend/dist-win-x64",
         "to": "backend",
         "filter": [
-          "**/*"
+          "**/*",
+          "!Data/finora.db*",
+          "!Data/*.db*"
         ]
       }
     ],
@@ -68,7 +70,7 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
-      "deleteAppDataOnUninstall": true,
+      "deleteAppDataOnUninstall": false,
       "include": "build/installer.nsh",
       "runAfterFinish": true,
       "artifactName": "FINORA_Setup.${ext}"

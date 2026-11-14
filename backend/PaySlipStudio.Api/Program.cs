@@ -77,21 +77,47 @@ builder.Configuration["FINORA_BASE_DATA_DIR"] = baseDataDir;
 var configuredProvider = builder.Configuration["Database:Provider"] ?? "Sqlite";
 var effectiveProvider = isDesktopMode ? "Sqlite" : configuredProvider;
 
+var sqliteDbPath = Path.Combine(dataDir, "finora.db");
+
+// Seamless Legacy Database Migration & User Data Preservation
+if (!File.Exists(sqliteDbPath))
+{
+    var legacyCandidates = new[]
+    {
+        Path.Combine(AppContext.BaseDirectory, "Data", "finora.db"),
+        Path.Combine(AppContext.BaseDirectory, "finora.db"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FINORA", "Data", "finora.db"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "FINORA", "Data", "finora.db"),
+        @"G:\UAV\PAY SLIP\backend\PaySlipStudio.Api\Data\finora.db"
+    };
+
+    foreach (var legacy in legacyCandidates)
+    {
+        if (File.Exists(legacy) && !string.Equals(Path.GetFullPath(legacy), Path.GetFullPath(sqliteDbPath), StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                Directory.CreateDirectory(dataDir);
+                File.Copy(legacy, sqliteDbPath, overwrite: false);
+                if (File.Exists(legacy + "-wal")) File.Copy(legacy + "-wal", sqliteDbPath + "-wal", overwrite: false);
+                if (File.Exists(legacy + "-shm")) File.Copy(legacy + "-shm", sqliteDbPath + "-shm", overwrite: false);
+                break;
+            }
+            catch { }
+        }
+    }
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var customConn = builder.Configuration.GetConnectionString("DefaultConnection");
-    if (!string.IsNullOrWhiteSpace(customConn))
+    if (!isDesktopMode && !string.IsNullOrWhiteSpace(customConn))
     {
         options.UseSqlite(customConn);
     }
-    else if (string.Equals(effectiveProvider, "Sqlite", StringComparison.OrdinalIgnoreCase))
-    {
-        var sqliteDbPath = Path.Combine(dataDir, "finora.db");
-        options.UseSqlite($"Data Source={sqliteDbPath}");
-    }
     else
     {
-        options.UseSqlite($"Data Source={Path.Combine(dataDir, "finora.db")}");
+        options.UseSqlite($"Data Source={sqliteDbPath}");
     }
 });
 
