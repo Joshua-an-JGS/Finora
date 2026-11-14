@@ -25,6 +25,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { apiRequest, getStoredToken } from '../services/api';
+import { getPayrollYears, notifyYearsUpdated, onYearsUpdated } from '../services/payrollYears';
 import type {
   ColumnMappingDefinitionDto,
   ExcelUploadSummaryDto,
@@ -116,6 +117,29 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
   const [reimportDiff, setReimportDiff] = useState<ControlledReimportDiffDto | null>(null);
   const [showReimportDiffModal, setShowReimportDiffModal] = useState<boolean>(false);
   const [diffLoading, setDiffLoading] = useState<boolean>(false);
+
+  // Dynamic Payroll Years
+  const [candidateYears, setCandidateYears] = useState<number[]>([2030, 2029, 2028, 2027, 2026, 2025]);
+  const [availableYears, setAvailableYears] = useState<number[]>([2028, 2027, 2026, 2025]);
+
+  useEffect(() => {
+    const fetchYears = async () => {
+      try {
+        const data = await getPayrollYears();
+        if (data.availableYears && data.availableYears.length > 0) {
+          setAvailableYears(data.availableYears);
+        }
+        if (data.importCandidateYears && data.importCandidateYears.length > 0) {
+          setCandidateYears(data.importCandidateYears);
+        }
+      } catch (e) {
+        console.error('Failed to load years in ImportWizardView:', e);
+      }
+    };
+    fetchYears();
+    const unsub = onYearsUpdated(fetchYears);
+    return unsub;
+  }, []);
 
   // Archive Library state
   const [archiveData, setArchiveData] = useState<ArchiveYearGroupDto[]>([]);
@@ -306,6 +330,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
           worksheet: `${res.totalPeriodsImported} periods [${res.importedPeriodLabels?.join(', ')}]`,
           periodsImported: res.importedPeriodLabels,
         });
+        notifyYearsUpdated();
       } catch (err: any) {
         setError(err.message || 'Multi-period import commit failed.');
       } finally {
@@ -331,6 +356,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
         }),
       });
       setCommittedResult(res);
+      notifyYearsUpdated();
     } catch (err: any) {
       setError(err.message || 'Import commit failed.');
     } finally {
@@ -424,6 +450,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
       setBatchToRemove(null);
       setRemovalSafety(null);
       loadArchive();
+      notifyYearsUpdated();
     } catch (err: any) {
       alert(`Batch removal failed: ${err.message}`);
     } finally {
@@ -551,7 +578,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                   All Years
                 </button>
                 {Array.from(
-                  new Set([2028, 2027, 2026, 2025, ...archiveData.map((d) => d.year)])
+                  new Set([...availableYears, ...archiveData.map((d) => d.year)])
                 )
                   .sort((a, b) => b - a)
                   .map((y) => (
@@ -979,11 +1006,13 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                             onChange={(e) => setYear(Number(e.target.value))}
                             className="w-full px-3 py-2 text-[13px] border border-[#E5E7EB] rounded-[7px] bg-[#FFFFFF]"
                           >
-                            {[2025, 2026, 2027].map((y) => (
-                              <option key={y} value={y}>
-                                {y}
-                              </option>
-                            ))}
+                            {Array.from(new Set([year, ...candidateYears]))
+                              .sort((a, b) => b - a)
+                              .map((y) => (
+                                <option key={y} value={y}>
+                                  {y}
+                                </option>
+                              ))}
                           </select>
                         </div>
                       </div>
@@ -1000,11 +1029,13 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                             onChange={(e) => setYear(Number(e.target.value))}
                             className="w-full px-3 py-2 text-[13px] border border-[#E5E7EB] rounded-[7px] bg-[#FFFFFF]"
                           >
-                            {[2025, 2026, 2027].map((y) => (
-                              <option key={y} value={y}>
-                                {y}
-                              </option>
-                            ))}
+                            {Array.from(new Set([year, ...candidateYears]))
+                              .sort((a, b) => b - a)
+                              .map((y) => (
+                                <option key={y} value={y}>
+                                  {y}
+                                </option>
+                              ))}
                           </select>
                         </div>
                         <div className="text-[12px] text-[#6B7280] flex items-center gap-1.5">
@@ -1025,11 +1056,13 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                             onChange={(e) => setYear(Number(e.target.value))}
                             className="w-full px-3 py-2 text-[13px] border border-[#E5E7EB] rounded-[7px] bg-[#FFFFFF]"
                           >
-                            {[2025, 2026, 2027].map((y) => (
-                              <option key={y} value={y}>
-                                {y}
-                              </option>
-                            ))}
+                            {Array.from(new Set([year, ...candidateYears]))
+                              .sort((a, b) => b - a)
+                              .map((y) => (
+                                <option key={y} value={y}>
+                                  {y}
+                                </option>
+                              ))}
                           </select>
                         </div>
 

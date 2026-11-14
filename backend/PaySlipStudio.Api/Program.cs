@@ -158,6 +158,7 @@ builder.Services.AddScoped<PayslipDocumentResolver>();
 builder.Services.AddScoped<ExcelPayrollService>();
 builder.Services.AddScoped<PdfRenderingService>();
 builder.Services.AddScoped<EmailDeliveryService>();
+builder.Services.AddScoped<IPayrollYearService, PayrollYearService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

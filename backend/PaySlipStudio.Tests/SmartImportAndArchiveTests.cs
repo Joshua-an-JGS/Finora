@@ -429,4 +429,58 @@ public class SmartImportAndArchiveTests : IClassFixture<WebApplicationFactory<Pr
         var y2026 = archiveResp!.Single(y => y.Year == 2026);
         Assert.DoesNotContain(y2026.ArchivedFiles, f => f.ImportBatchId == batchId);
     }
+
+    [Fact]
+    public async Task Test8_DynamicPayrollYears_ReturnsDatabaseAndCandidateYears()
+    {
+        var client = await CreateAuthenticatedClientAsync("admin@amtdc.org", "Admin@12345!");
+        var yearsResp = await client.GetFromJsonAsync<PayrollYearsDto>("/api/payroll/years");
+
+        Assert.NotNull(yearsResp);
+        Assert.True(yearsResp.AvailableYears.Contains(2026));
+        Assert.True(yearsResp.AvailableYears.Contains(2027));
+        Assert.True(yearsResp.AvailableYears.Contains(2025));
+        // Verify candidate years cover future import candidates
+        Assert.True(yearsResp.ImportCandidateYears.Contains(2029));
+        Assert.True(yearsResp.ImportCandidateYears.Contains(2030));
+        // Verify sorted descending
+        var sorted = yearsResp.AvailableYears.OrderByDescending(y => y).ToList();
+        Assert.Equal(sorted, yearsResp.AvailableYears);
+    }
+
+    [Fact]
+    public async Task Test9_ImportingNewYear_DynamicallyExposesYearAcrossSystem()
+    {
+        var client = await CreateAuthenticatedClientAsync("admin@amtdc.org", "Admin@12345!");
+        // Create sample workbook for year 2029
+        var bytes = CreateSampleExcelBytes("January 2029", "January", 2029);
+
+        using var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(bytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        content.Add(fileContent, "file", "Payroll_2029_Test.xlsx");
+        content.Add(new StringContent("1"), "month");
+        content.Add(new StringContent("2029"), "year");
+
+        var uploadResp = await client.PostAsync("/api/payroll/import/upload", content);
+        var uploadJson = await uploadResp.Content.ReadFromJsonAsync<JsonElement>();
+        var batchId = uploadJson.GetProperty("importBatchId").GetGuid();
+
+        // Commit import for 2029
+        var commitResp = await client.PostAsJsonAsync($"/api/payroll/import/{batchId}/commit", new { allowReplaceExisting = true });
+        commitResp.EnsureSuccessStatusCode();
+
+        // 1. Verify dynamic years API now includes 2029
+        var yearsResp = await client.GetFromJsonAsync<PayrollYearsDto>("/api/payroll/years?force=true");
+        Assert.NotNull(yearsResp);
+        Assert.Contains(2029, yearsResp.AvailableYears);
+
+        // 2. Verify archive now includes year 2029 group with 1 month imported
+        var archiveResp = await client.GetFromJsonAsync<List<ArchiveYearGroupDto>>("/api/payroll/import/archive?year=2029");
+        Assert.NotNull(archiveResp);
+        var y2029 = archiveResp.Single(y => y.Year == 2029);
+        var jan2029 = y2029.Months.Single(m => m.Month == 1);
+        Assert.True(jan2029.IsImported);
+        Assert.True(jan2029.EmployeeCount > 0);
+    }
 }

@@ -40,6 +40,7 @@ import {
   Type,
 } from 'lucide-react';
 import { apiRequest, getAuthorizedDownloadUrl } from '../services/api';
+import { getPayrollYears, onYearsUpdated } from '../services/payrollYears';
 import type {
   CustomPayslipTable,
   EditorComponentItemDto,
@@ -172,6 +173,23 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
   const [componentsEdit, setComponentsEdit] = useState<EditorComponentItemDto[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [showZeroValueRowsOverride, setShowZeroValueRowsOverride] = useState<boolean | null>(null);
+
+  // Dynamic Payroll Years
+  const [editorAvailableYears, setEditorAvailableYears] = useState<number[]>([2028, 2027, 2026, 2025]);
+
+  useEffect(() => {
+    const loadYears = async () => {
+      try {
+        const data = await getPayrollYears();
+        if (data.availableYears?.length > 0) {
+          setEditorAvailableYears(data.availableYears);
+        }
+      } catch {}
+    };
+    loadYears();
+    const unsub = onYearsUpdated(loadYears);
+    return unsub;
+  }, []);
   const [styleEdit, setStyleEdit] = useState<PayslipTemplateConfig | null>(null);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [saveTemplateName, setSaveTemplateName] = useState('');
@@ -1999,9 +2017,9 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                 </span>
               </div>
 
-              {/* Search + Employee Dropdown + Month Picker */}
+              {/* Search + Employee Dropdown + Month Picker + Year Picker */}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                <div className="sm:col-span-5 relative">
+                <div className="sm:col-span-4 relative">
                   <Search className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
@@ -2027,7 +2045,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   </select>
                 </div>
 
-                <div className="sm:col-span-3">
+                <div className="sm:col-span-2">
                   <select
                     aria-label="Payroll Month"
                     value={activeMonth}
@@ -2036,9 +2054,26 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   >
                     {MONTHS.map((m) => (
                       <option key={m.value} value={m.value}>
-                        {m.label} {activeYear}
+                        {m.label}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <select
+                    aria-label="Payroll Year"
+                    value={activeYear}
+                    onChange={(e) => onMonthYearChange(activeMonth, Number(e.target.value))}
+                    className="w-full px-2 py-1.5 text-[13px] font-medium border border-[#E5E7EB] rounded-[7px]"
+                  >
+                    {Array.from(new Set([activeYear, ...editorAvailableYears]))
+                      .sort((a, b) => b - a)
+                      .map((yr) => (
+                        <option key={yr} value={yr}>
+                          {yr}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>

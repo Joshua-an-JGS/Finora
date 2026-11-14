@@ -572,3 +572,18 @@ export interface SystemInfo {
   attribution: string;
   serverTimeUtc: string;
 }
+
+export interface PayrollYearSummaryItem {
+  year: number;
+  monthsWithRecords: number;
+  totalEmployees: number;
+  totalNetPayroll: number;
+}
+
+export interface PayrollYearsDto {
+  activeYear: number;
+  activeMonth: number;
+  availableYears: number[];
+  importCandidateYears: number[];
+  summaries: PayrollYearSummaryItem[];
+}

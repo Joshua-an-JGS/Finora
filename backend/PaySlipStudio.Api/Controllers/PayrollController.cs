@@ -20,6 +20,7 @@ public class PayrollController : ControllerBase
     private readonly PayslipDocumentResolver _resolver;
     private readonly PdfRenderingService _pdfService;
     private readonly AuditService _audit;
+    private readonly IPayrollYearService _yearService;
     private readonly IWebHostEnvironment _env;
 
     public PayrollController(
@@ -28,6 +29,7 @@ public class PayrollController : ControllerBase
         PayslipDocumentResolver resolver,
         PdfRenderingService pdfService,
         AuditService audit,
+        IPayrollYearService yearService,
         IWebHostEnvironment env)
     {
         _db = db;
@@ -35,6 +37,7 @@ public class PayrollController : ControllerBase
         _resolver = resolver;
         _pdfService = pdfService;
         _audit = audit;
+        _yearService = yearService;
         _env = env;
     }
 
@@ -42,10 +45,18 @@ public class PayrollController : ControllerBase
     private string CurrentUserName => User.Identity?.Name ?? "Operator";
     private string CurrentUserRole => User.FindFirstValue(ClaimTypes.Role) ?? AppRoles.Viewer;
 
+    [HttpGet("years")]
+    public async Task<IActionResult> GetAvailableYears([FromQuery] bool force = false)
+    {
+        var years = await _yearService.GetAvailableYearsAsync(force);
+        return Ok(years);
+    }
+
     [HttpGet("periods")]
     public async Task<IActionResult> GetPeriods()
     {
         var settings = await _db.CompanySettings.AsNoTracking().FirstOrDefaultAsync() ?? new CompanySettings();
+        var yearsDto = await _yearService.GetAvailableYearsAsync();
         var periods = await _db.PayrollPeriods
             .AsNoTracking()
             .OrderByDescending(p => p.Year)
@@ -68,6 +79,8 @@ public class PayrollController : ControllerBase
         {
             activeMonth = settings.ActivePayrollMonth,
             activeYear = settings.ActivePayrollYear,
+            availableYears = yearsDto.AvailableYears,
+            importCandidateYears = yearsDto.ImportCandidateYears,
             periods
         });
     }
@@ -84,6 +97,7 @@ public class PayrollController : ControllerBase
             settings.ActivePayrollYear = Math.Clamp(req.Year, 2000, 2100);
             settings.UpdatedAtUtc = DateTime.UtcNow;
             await _db.SaveChangesAsync();
+            _yearService.InvalidateCache();
         }
         return Ok(new
         {

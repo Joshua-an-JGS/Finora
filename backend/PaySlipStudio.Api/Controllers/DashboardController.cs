@@ -13,10 +13,12 @@ namespace PaySlipStudio.Api.Controllers;
 public class DashboardController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IPayrollYearService _yearService;
 
-    public DashboardController(ApplicationDbContext db)
+    public DashboardController(ApplicationDbContext db, IPayrollYearService yearService)
     {
         _db = db;
+        _yearService = yearService;
     }
 
     [HttpGet]
@@ -132,12 +134,16 @@ public class DashboardController : ControllerBase
             })
             .ToListAsync();
 
+        var yearsDto = await _yearService.GetAvailableYearsAsync();
+
         return Ok(new
         {
             activeMonth,
             activeYear,
             activePeriodLabel = ExcelPayrollService.FormatPeriodLabel(activeMonth, activeYear),
             currencySymbol = settings.CurrencySymbol,
+            availableYears = yearsDto.AvailableYears,
+            importCandidateYears = yearsDto.ImportCandidateYears,
             metrics = new
             {
                 totalEmployeesInMonth,

@@ -16,12 +16,14 @@ public class ExcelPayrollService
 {
     private readonly ApplicationDbContext _db;
     private readonly AuditService _audit;
+    private readonly IPayrollYearService _yearService;
     private readonly string _storageRoot;
 
-    public ExcelPayrollService(ApplicationDbContext db, AuditService audit, IConfiguration config, IWebHostEnvironment env)
+    public ExcelPayrollService(ApplicationDbContext db, AuditService audit, IConfiguration config, IWebHostEnvironment env, IPayrollYearService yearService)
     {
         _db = db;
         _audit = audit;
+        _yearService = yearService;
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
         var configuredPath = config["Storage:RootPath"] ?? "Storage/PrivateVault";
@@ -858,6 +860,7 @@ public class ExcelPayrollService
         }
 
         await _db.SaveChangesAsync();
+        _yearService.InvalidateCache();
 
         await _audit.RecordAsync(
             actorUserId,
@@ -1006,7 +1009,8 @@ public class ExcelPayrollService
             .OrderByDescending(b => b.CommittedAtUtc ?? b.CreatedAtUtc)
             .ToListAsync();
 
-        var yearsSet = new HashSet<int> { 2025, 2026, 2027 };
+        var yearsDto = await _yearService.GetAvailableYearsAsync();
+        var yearsSet = new HashSet<int>(yearsDto.AvailableYears);
         foreach (var p in periodsWithData) yearsSet.Add(p.Year);
         foreach (var b in allBatches)
         {
@@ -1258,6 +1262,7 @@ public class ExcelPayrollService
 
         _db.ImportBatches.Remove(batch);
         await _db.SaveChangesAsync();
+        _yearService.InvalidateCache();
 
         await _audit.RecordAsync(
             actorUserId,

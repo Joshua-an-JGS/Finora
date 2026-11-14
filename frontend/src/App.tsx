@@ -32,6 +32,11 @@ import {
   getStoredToken,
   getStoredUser,
 } from './services/api';
+import {
+  getPayrollYears,
+  onYearsUpdated,
+  setActivePayrollPeriod,
+} from './services/payrollYears';
 import type { EmployeeSearchItem, UserProfile } from './types/payroll';
 import { LoginView } from './components/LoginView';
 import { AdminConsoleView } from './components/AdminConsoleView';
@@ -126,9 +131,55 @@ export const App: React.FC = () => {
   const [activeNav, setActiveNav] = useState<NavKey>('editor');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Global Active Payroll Month & Year
+  // Global Active Payroll Month & Year (Dynamic from centralized payroll year service)
   const [activeMonth, setActiveMonth] = useState<number>(10);
   const [activeYear, setActiveYear] = useState<number>(2026);
+  const [availableYears, setAvailableYears] = useState<number[]>([2028, 2027, 2026, 2025]);
+
+  const loadDynamicYears = async (force = false) => {
+    try {
+      const data = await getPayrollYears(force);
+      if (data.availableYears && data.availableYears.length > 0) {
+        setAvailableYears(data.availableYears);
+      }
+      if (data.activeYear) {
+        setActiveYear(data.activeYear);
+      }
+      if (data.activeMonth) {
+        setActiveMonth(data.activeMonth);
+      }
+    } catch (e) {
+      console.error('Failed to load dynamic payroll years:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadDynamicYears();
+    }
+    const unsub = onYearsUpdated(() => {
+      loadDynamicYears(true);
+    });
+    return unsub;
+  }, [user]);
+
+  const handleYearChange = async (newYear: number) => {
+    setActiveYear(newYear);
+    try {
+      await setActivePayrollPeriod(activeMonth, newYear);
+    } catch (err) {
+      console.error('Failed to set active payroll year:', err);
+    }
+  };
+
+  const handleMonthChange = async (newMonth: number) => {
+    setActiveMonth(newMonth);
+    try {
+      await setActivePayrollPeriod(newMonth, activeYear);
+    } catch (err) {
+      console.error('Failed to set active payroll month:', err);
+    }
+  };
   const [selectedEditorRecordId, setSelectedEditorRecordId] = useState<string | null>(null);
   const [showCompanyWizard, setShowCompanyWizard] = useState(false);
 
@@ -557,7 +608,7 @@ export const App: React.FC = () => {
                 <select
                   aria-label="Active Payroll Month"
                   value={activeMonth}
-                  onChange={(e) => setActiveMonth(Number(e.target.value))}
+                  onChange={(e) => handleMonthChange(Number(e.target.value))}
                   className="flex-1 text-[12.5px] font-semibold text-[#1F2937] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[6px] px-2 py-1"
                 >
                   {MONTHS.map((m) => (
@@ -569,14 +620,16 @@ export const App: React.FC = () => {
                 <select
                   aria-label="Active Payroll Year"
                   value={activeYear}
-                  onChange={(e) => setActiveYear(Number(e.target.value))}
+                  onChange={(e) => handleYearChange(Number(e.target.value))}
                   className="w-[72px] text-[12.5px] font-semibold text-[#1F2937] bg-[#FFFFFF] border border-[#E5E7EB] rounded-[6px] px-1.5 py-1"
                 >
-                  {[2025, 2026, 2027].map((yr) => (
-                    <option key={yr} value={yr}>
-                      {yr}
-                    </option>
-                  ))}
+                  {Array.from(new Set([activeYear, ...availableYears]))
+                    .sort((a, b) => b - a)
+                    .map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
@@ -911,6 +964,10 @@ export const App: React.FC = () => {
                 activeMonth={activeMonth}
                 activeYear={activeYear}
                 canEdit={canEdit}
+                onMonthYearChange={(m, y) => {
+                  handleMonthChange(m);
+                  handleYearChange(y);
+                }}
                 onOpenRecordInEditor={(id) => handleOpenRecordInEditor(id)}
               />
             </div>

@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { apiRequest, getAuthorizedDownloadUrl } from '../services/api';
+import { getPayrollYears, onYearsUpdated } from '../services/payrollYears';
 import { formatIndianCurrency } from './PayslipA4Paper';
 import type { EmailHistoryItem, EmailTemplateItem, PayslipTemplateItem, UserProfile } from '../types/payroll';
 
@@ -472,10 +473,22 @@ export const MonthlyPayrollView: React.FC<{
   onMonthYearChange?: (m: number, y: number) => void;
   onOpenRecordInEditor?: (recordId: string) => void;
   onOpenEditor?: (recordId: string) => void;
-}> = ({ activeMonth, activeYear, onOpenRecordInEditor, onOpenEditor }) => {
+}> = ({ activeMonth, activeYear, onMonthYearChange, onOpenRecordInEditor, onOpenEditor }) => {
   const [search, setSearch] = useState('');
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [monthlyYears, setMonthlyYears] = useState<number[]>([2028, 2027, 2026, 2025]);
+
+  useEffect(() => {
+    const loadYears = async () => {
+      try {
+        const d = await getPayrollYears();
+        if (d.availableYears?.length > 0) setMonthlyYears(d.availableYears);
+      } catch {}
+    };
+    loadYears();
+    return onYearsUpdated(loadYears);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -506,7 +519,39 @@ export const MonthlyPayrollView: React.FC<{
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {onMonthYearChange && (
+            <div className="flex items-center gap-1.5 bg-[#FFFFFF] border border-[#E5E7EB] rounded-[7px] p-1 shadow-xs">
+              <select
+                aria-label="Filter Month"
+                value={activeMonth}
+                onChange={(e) => onMonthYearChange(Number(e.target.value), activeYear)}
+                className="px-2 py-1 text-[12.5px] font-semibold text-[#1F2937] bg-transparent border-0 focus:outline-hidden cursor-pointer"
+              >
+                {MONTHS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[#D1D5DB] text-[12px]">|</span>
+              <select
+                aria-label="Filter Year"
+                value={activeYear}
+                onChange={(e) => onMonthYearChange(activeMonth, Number(e.target.value))}
+                className="px-2 py-1 text-[12.5px] font-semibold text-[#1F2937] bg-transparent border-0 focus:outline-hidden cursor-pointer"
+              >
+                {Array.from(new Set([activeYear, ...monthlyYears]))
+                  .sort((a, b) => b - a)
+                  .map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
           <div className="relative w-64">
             <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
