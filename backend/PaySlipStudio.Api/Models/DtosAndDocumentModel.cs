@@ -285,6 +285,12 @@ public class ExcelUploadSummaryDto
     public string SelectedWorksheet { get; set; } = string.Empty;
     public bool HasExistingRecordsForPeriod { get; set; }
     public int ExistingRecordCountForPeriod { get; set; }
+    public string ImportMode { get; set; } = "SingleMonth";
+    public List<DetectedPeriodDto> DetectedPeriods { get; set; } = new();
+    public int TotalEmployeesDetected { get; set; }
+    public bool IsDuplicateFile { get; set; }
+    public Guid? PreviousImportBatchId { get; set; }
+    public DateTime? PreviousImportDateUtc { get; set; }
 }
 public class WorksheetSummaryDto
 {
@@ -318,6 +324,12 @@ public class ImportValidationPreviewDto
     public string PeriodLabel { get; set; } = string.Empty;
     public bool HasExistingRecordsForPeriod { get; set; }
     public int ExistingRecordCountForPeriod { get; set; }
+    public string ImportMode { get; set; } = "SingleMonth";
+    public List<DetectedPeriodDto> DetectedPeriods { get; set; } = new();
+    public int TotalEmployeesDetected { get; set; }
+    public bool IsDuplicateFile { get; set; }
+    public Guid? PreviousImportBatchId { get; set; }
+    public DateTime? PreviousImportDateUtc { get; set; }
     public bool IsDuplicateFileUpload { get; set; }
     public List<ColumnMappingDefinitionDto> ColumnMappings { get; set; } = new();
     public List<PreviewEmployeeRowDto> Rows { get; set; } = new();
@@ -391,4 +403,129 @@ public class ComponentOverrideUpdateItem
     public decimal? OverrideNumericValue { get; set; }
     public string? OverrideTextValue { get; set; }
     public bool? ExplicitVisibilityOverride { get; set; }
+}
+
+public class DetectedPeriodDto
+{
+    public int Month { get; set; }
+    public int Year { get; set; }
+    public string PeriodLabel { get; set; } = string.Empty;
+    public string WorksheetName { get; set; } = string.Empty;
+    public int EmployeeCount { get; set; }
+    public bool HasExistingRecords { get; set; }
+    public int ExistingRecordCount { get; set; }
+    public bool IsSelected { get; set; } = true;
+    public string Status { get; set; } = "Ready"; // "Ready", "ExistingRecordsFound", "Imported"
+}
+
+public class SmartFileAnalysisDto
+{
+    public Guid ImportBatchId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public long FileSizeBytes { get; set; }
+    public string FileSha256 { get; set; } = string.Empty;
+    public string ImportMode { get; set; } = "SingleMonth";
+    public List<WorksheetSummaryDto> Worksheets { get; set; } = new();
+    public List<DetectedPeriodDto> DetectedPeriods { get; set; } = new();
+    public int TotalEmployeesDetected { get; set; }
+    public int WorksheetsDetected { get; set; }
+    public bool IsDuplicateFile { get; set; }
+    public Guid? PreviousImportBatchId { get; set; }
+    public DateTime? PreviousImportDateUtc { get; set; }
+    public string Status { get; set; } = "Ready for validation";
+    public List<string> Warnings { get; set; } = new();
+    public List<string> Errors { get; set; } = new();
+}
+
+public class ControlledReimportDiffDto
+{
+    public Guid ImportBatchId { get; set; }
+    public int Month { get; set; }
+    public int Year { get; set; }
+    public string PeriodLabel { get; set; } = string.Empty;
+    public int AddedCount { get; set; }
+    public int UpdatedCount { get; set; }
+    public int UnchangedCount { get; set; }
+    public int TotalIncomingCount { get; set; }
+    public List<ReimportDiffRowDto> AddedRows { get; set; } = new();
+    public List<ReimportDiffRowDto> UpdatedRows { get; set; } = new();
+    public List<ReimportDiffRowDto> UnchangedRows { get; set; } = new();
+}
+
+public class ReimportDiffRowDto
+{
+    public string EmployeeCode { get; set; } = string.Empty;
+    public string EmployeeName { get; set; } = string.Empty;
+    public decimal? IncomingNetSalary { get; set; }
+    public decimal? ExistingNetSalary { get; set; }
+    public List<string> ChangedFields { get; set; } = new();
+}
+
+public class CommitMultiPeriodRequest
+{
+    public List<PeriodCommitSelectionItem> SelectedPeriods { get; set; } = new();
+    public bool AllowReplaceExisting { get; set; }
+}
+
+public class PeriodCommitSelectionItem
+{
+    public int Month { get; set; }
+    public int Year { get; set; }
+    public string WorksheetName { get; set; } = string.Empty;
+}
+
+public class CommitMultiPeriodResultDto
+{
+    public Guid ImportBatchId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public int TotalPeriodsImported { get; set; }
+    public int TotalEmployeesImported { get; set; }
+    public List<string> ImportedPeriodLabels { get; set; } = new();
+}
+
+public class ArchiveYearGroupDto
+{
+    public int Year { get; set; }
+    public List<ArchiveMonthItemDto> Months { get; set; } = new();
+    public List<ArchiveFileItemDto> ArchivedFiles { get; set; } = new();
+}
+
+public class ArchiveMonthItemDto
+{
+    public int Month { get; set; }
+    public string MonthName { get; set; } = string.Empty;
+    public string PeriodLabel { get; set; } = string.Empty;
+    public bool IsImported { get; set; }
+    public int EmployeeCount { get; set; }
+    public decimal TotalNetPayroll { get; set; }
+    public Guid? PayrollPeriodId { get; set; }
+    public Guid? LatestImportBatchId { get; set; }
+    public DateTime? LatestImportDateUtc { get; set; }
+}
+
+public class ArchiveFileItemDto
+{
+    public Guid ImportBatchId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string FileSha256 { get; set; } = string.Empty;
+    public int Year { get; set; }
+    public int? Month { get; set; }
+    public string ImportMode { get; set; } = string.Empty;
+    public string SourceFileRetentionStatus { get; set; } = "Retained"; // "Retained", "Deleted"
+    public bool PhysicalFileExists { get; set; }
+    public long FileSizeBytes { get; set; }
+    public DateTime ImportDateUtc { get; set; }
+    public string ImportedBy { get; set; } = string.Empty;
+    public int EmployeeCount { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public List<string> DetectedPeriods { get; set; } = new();
+}
+
+public class RemoveBatchSafetyCheckDto
+{
+    public bool CanRemove { get; set; }
+    public int PayslipsDeliveredCount { get; set; }
+    public bool IsPeriodFinalized { get; set; }
+    public int PayrollRecordsCount { get; set; }
+    public List<string> Warnings { get; set; } = new();
 }

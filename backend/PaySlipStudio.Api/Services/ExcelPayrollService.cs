@@ -31,6 +31,7 @@ public class ExcelPayrollService
 
         Directory.CreateDirectory(Path.Combine(_storageRoot, "Imports"));
         Directory.CreateDirectory(Path.Combine(_storageRoot, "Exports"));
+        Directory.CreateDirectory(Path.Combine(_storageRoot, "Payroll_Archive"));
     }
 
     public static string FormatPeriodLabel(int month, int year)
@@ -48,7 +49,9 @@ public class ExcelPayrollService
         int month,
         int year,
         string userId,
-        string userName)
+        string userName,
+        string importMode = "SingleMonth",
+        List<int>? requestedMonths = null)
     {
         var ext = Path.GetExtension(originalFileName).ToLowerInvariant();
         if (ext is not (".xlsx" or ".xls" or ".csv"))
@@ -71,18 +74,47 @@ public class ExcelPayrollService
         }
 
         var sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        var safeFileName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{ext}";
-        var storedPath = Path.Combine(_storageRoot, "Imports", safeFileName);
-        await File.WriteAllBytesAsync(storedPath, bytes);
 
-        var periodLabel = FormatPeriodLabel(month, year);
-        var period = await GetOrCreatePeriodAsync(month, year);
+        // Check if duplicate file exists in history
+        var previousCommittedBatch = await _db.ImportBatches
+            .Include(b => b.PayrollPeriod)
+            .Where(b => b.FileSha256 == sha256 && b.Status == "Committed")
+            .OrderByDescending(b => b.CommittedAtUtc ?? b.CreatedAtUtc)
+            .FirstOrDefaultAsync();
+
+        bool isDuplicateFile = previousCommittedBatch != null;
+        Guid? previousImportBatchId = previousCommittedBatch?.Id;
+        DateTime? previousImportDateUtc = previousCommittedBatch?.CommittedAtUtc ?? previousCommittedBatch?.CreatedAtUtc;
 
         var worksheets = InspectWorksheets(bytes, ext, originalFileName);
         if (worksheets.Count == 0)
         {
             throw new InvalidOperationException("No readable worksheets were found in the uploaded file.");
         }
+
+        var detectedPeriods = await SmartDetectPeriodsAsync(bytes, ext, originalFileName, worksheets, importMode, month, year, requestedMonths);
+
+        int targetYear = year;
+        if (importMode == "AutoDetect" && detectedPeriods.Count > 0)
+        {
+            targetYear = detectedPeriods[0].Year;
+        }
+
+        // Permanent Year-Wise Physical Archive
+        var safeFileName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{ext}";
+        var archiveDir = Path.Combine(_storageRoot, "Payroll_Archive", targetYear.ToString());
+        Directory.CreateDirectory(archiveDir);
+        var storedPath = Path.Combine(archiveDir, safeFileName);
+        await File.WriteAllBytesAsync(storedPath, bytes);
+
+        int primaryMonth = month;
+        if (importMode is "AutoDetect" or "FullYear" && detectedPeriods.Count > 0)
+        {
+            primaryMonth = detectedPeriods[0].Month;
+        }
+
+        var periodLabel = FormatPeriodLabel(primaryMonth, targetYear);
+        var period = await GetOrCreatePeriodAsync(primaryMonth, targetYear);
 
         // Auto-select worksheet matching the period label if available
         var matchingSheet = worksheets.FirstOrDefault(w =>
@@ -101,6 +133,11 @@ public class ExcelPayrollService
             SelectedWorksheet = matchingSheet.Name,
             TotalRowsDetected = Math.Max(0, matchingSheet.RowCount - 1),
             Status = "Staged",
+            ImportMode = importMode,
+            SourceFileRetentionStatus = "Retained",
+            PayrollYear = targetYear,
+            PayrollMonth = primaryMonth,
+            DetectedPeriodsJson = JsonSerializer.Serialize(detectedPeriods),
             UploadedByUserId = userId,
             UploadedByUserName = userName,
             CreatedAtUtc = DateTime.UtcNow
@@ -115,13 +152,19 @@ public class ExcelPayrollService
             FileName = originalFileName,
             FileSizeBytes = bytes.Length,
             FileSha256 = sha256,
-            Month = month,
-            Year = year,
+            Month = primaryMonth,
+            Year = targetYear,
             PeriodLabel = periodLabel,
             Worksheets = worksheets,
             SelectedWorksheet = matchingSheet.Name,
             HasExistingRecordsForPeriod = existingCount > 0,
-            ExistingRecordCountForPeriod = existingCount
+            ExistingRecordCountForPeriod = existingCount,
+            ImportMode = importMode,
+            DetectedPeriods = detectedPeriods,
+            TotalEmployeesDetected = detectedPeriods.Sum(p => p.EmployeeCount),
+            IsDuplicateFile = isDuplicateFile,
+            PreviousImportBatchId = previousImportBatchId,
+            PreviousImportDateUtc = previousImportDateUtc
         };
     }
 
@@ -587,6 +630,870 @@ public class ExcelPayrollService
             new { batch.SourceFileName, batch.SelectedWorksheet, period.PeriodLabel, importedCount });
 
         return batch;
+    }
+
+    // ========================================================================
+    // COMMIT MULTI-PERIOD IMPORT BATCH
+    // ========================================================================
+    public async Task<CommitMultiPeriodResultDto> CommitMultiPeriodBatchAsync(
+        Guid importBatchId,
+        List<PeriodCommitSelectionItem> selectedPeriods,
+        bool allowReplaceExisting,
+        string actorUserId,
+        string actorUserName,
+        string actorRole)
+    {
+        var batch = await _db.ImportBatches
+            .Include(b => b.PayrollPeriod)
+            .FirstOrDefaultAsync(b => b.Id == importBatchId)
+            ?? throw new KeyNotFoundException("Import batch not found.");
+
+        if (selectedPeriods == null || selectedPeriods.Count == 0)
+        {
+            throw new InvalidOperationException("Please select at least one payroll period to commit.");
+        }
+
+        var importedPeriodLabels = new List<string>();
+        int totalEmployees = 0;
+
+        foreach (var item in selectedPeriods)
+        {
+            var period = await GetOrCreatePeriodAsync(item.Month, item.Year);
+            var sheetName = !string.IsNullOrWhiteSpace(item.WorksheetName)
+                ? item.WorksheetName
+                : batch.SelectedWorksheet;
+
+            var preview = await AnalyzeAndPreviewAsync(
+                importBatchId,
+                sheetName,
+                item.Month,
+                item.Year,
+                null);
+
+            if (preview.GlobalIssues.Count > 0)
+            {
+                throw new InvalidOperationException($"Issues in {preview.PeriodLabel}: {string.Join(" ", preview.GlobalIssues)}");
+            }
+
+            if (preview.HasExistingRecordsForPeriod && !allowReplaceExisting)
+            {
+                throw new InvalidOperationException(
+                    $"Period '{preview.PeriodLabel}' already contains {preview.ExistingRecordCountForPeriod} records. Explicit confirmation is required to replace/update.");
+            }
+
+            var validRows = preview.Rows.Where(r => r.Errors.Count == 0).ToList();
+            if (validRows.Count == 0) continue;
+
+            var mappingsByCol = preview.ColumnMappings.ToDictionary(m => m.ColumnIndex);
+
+            foreach (var row in validRows)
+            {
+                var codeNormalized = row.EmployeeCode.Trim();
+                var employee = await _db.Employees
+                    .FirstOrDefaultAsync(e => e.EmployeeCode.ToLower() == codeNormalized.ToLower());
+
+                if (employee == null)
+                {
+                    employee = new Employee
+                    {
+                        EmployeeCode = codeNormalized,
+                        FullName = row.EmployeeName,
+                        Email = row.Email,
+                        Department = row.Department,
+                        Designation = row.Designation,
+                        IsActive = true,
+                        CreatedAtUtc = DateTime.UtcNow,
+                        UpdatedAtUtc = DateTime.UtcNow
+                    };
+                    _db.Employees.Add(employee);
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    employee.FullName = row.EmployeeName;
+                    if (!string.IsNullOrWhiteSpace(row.Email)) employee.Email = row.Email;
+                    if (!string.IsNullOrWhiteSpace(row.Department)) employee.Department = row.Department;
+                    if (!string.IsNullOrWhiteSpace(row.Designation)) employee.Designation = row.Designation;
+                    employee.UpdatedAtUtc = DateTime.UtcNow;
+                }
+
+                var rawSnapshot = new Dictionary<string, object?>();
+                foreach (var cell in row.Cells)
+                {
+                    rawSnapshot[cell.HeaderText] = new
+                    {
+                        cell.SourceCellType,
+                        cell.RawText,
+                        cell.NumericValue,
+                        cell.MappedRole,
+                        cell.IsFormula,
+                        cell.IsFormulaUncertain
+                    };
+                }
+
+                var existingRecord = await _db.PayrollRecords
+                    .Include(r => r.Components)
+                    .FirstOrDefaultAsync(r => r.PayrollPeriodId == period.Id && r.EmployeeId == employee.Id);
+
+                if (existingRecord != null)
+                {
+                    _db.PayrollComponentValues.RemoveRange(existingRecord.Components);
+                    existingRecord.ImportBatchId = batch.Id;
+                    existingRecord.ImportedEmployeeCode = codeNormalized;
+                    existingRecord.ImportedEmployeeName = row.EmployeeName;
+                    existingRecord.ImportedEmail = row.Email;
+                    existingRecord.ImportedDepartment = row.Department;
+                    existingRecord.ImportedDesignation = row.Designation;
+                    existingRecord.ImportedPayrollMonthText = !string.IsNullOrWhiteSpace(row.PayrollMonthCell)
+                        ? row.PayrollMonthCell
+                        : period.PeriodLabel;
+                    existingRecord.ImportedGrossSalary = row.GrossSalary;
+                    existingRecord.ImportedTotalDeductions = row.TotalDeductions;
+                    existingRecord.ImportedNetSalary = row.NetSalary;
+                    existingRecord.OverrideGrossSalary = null;
+                    existingRecord.OverrideTotalDeductions = null;
+                    existingRecord.OverrideNetSalary = null;
+                    existingRecord.OverrideEmployeeName = null;
+                    existingRecord.OverrideEmail = null;
+                    existingRecord.OverrideDepartment = null;
+                    existingRecord.OverrideDesignation = null;
+                    existingRecord.SourceRowSnapshotJson = JsonSerializer.Serialize(rawSnapshot);
+                    existingRecord.Status = "Imported";
+                    existingRecord.UpdatedAtUtc = DateTime.UtcNow;
+                    existingRecord.LastModifiedByUserName = actorUserName;
+                }
+                else
+                {
+                    existingRecord = new PayrollRecord
+                    {
+                        EmployeeId = employee.Id,
+                        PayrollPeriodId = period.Id,
+                        ImportBatchId = batch.Id,
+                        ImportedEmployeeCode = codeNormalized,
+                        ImportedEmployeeName = row.EmployeeName,
+                        ImportedEmail = row.Email,
+                        ImportedDepartment = row.Department,
+                        ImportedDesignation = row.Designation,
+                        ImportedPayrollMonthText = !string.IsNullOrWhiteSpace(row.PayrollMonthCell)
+                            ? row.PayrollMonthCell
+                            : period.PeriodLabel,
+                        ImportedGrossSalary = row.GrossSalary,
+                        ImportedTotalDeductions = row.TotalDeductions,
+                        ImportedNetSalary = row.NetSalary,
+                        SourceRowSnapshotJson = JsonSerializer.Serialize(rawSnapshot),
+                        Status = "Imported",
+                        CreatedAtUtc = DateTime.UtcNow,
+                        UpdatedAtUtc = DateTime.UtcNow,
+                        LastModifiedByUserName = actorUserName
+                    };
+                    _db.PayrollRecords.Add(existingRecord);
+                    await _db.SaveChangesAsync();
+                }
+
+                int sortOrder = 1;
+                foreach (var cell in row.Cells)
+                {
+                    if (!mappingsByCol.TryGetValue(cell.ColumnIndex, out var mapDef))
+                        continue;
+
+                    if (mapDef.MappedRole is "EmployeeId" or "EmployeeName" or "Email" or "Department" or "Designation" or "PayrollMonth"
+                        or "GrossSalary" or "TotalDeductions" or "NetSalary" or "Ignore")
+                    {
+                        continue;
+                    }
+
+                    string category = mapDef.MappedRole switch
+                    {
+                        "Allowance" => ComponentCategories.Allowance,
+                        "Deduction" => ComponentCategories.Deduction,
+                        "EmployerContribution" => ComponentCategories.EmployerContribution,
+                        "CustomText" => ComponentCategories.CustomText,
+                        _ => ComponentCategories.Earning
+                    };
+
+                    string cleanKey = Regex.Replace(mapDef.HeaderText.Trim(), @"[^\w]", "_");
+                    if (string.IsNullOrWhiteSpace(cleanKey)) cleanKey = $"comp_{cell.ColumnIndex}";
+
+                    var compVal = new PayrollComponentValue
+                    {
+                        PayrollRecordId = existingRecord.Id,
+                        ComponentKey = cleanKey,
+                        OriginalLabel = mapDef.HeaderText,
+                        OverrideLabel = null,
+                        Category = category,
+                        SortOrder = sortOrder++,
+                        ImportedNumericValue = cell.NumericValue,
+                        ImportedTextValue = cell.RawText,
+                        OverrideNumericValue = null,
+                        OverrideTextValue = null,
+                        IsFormulaCell = cell.IsFormula,
+                        IsFormulaUncertain = cell.IsFormulaUncertain,
+                        IsManuallyAdded = false,
+                        HasManualOverride = false,
+                        UpdatedAtUtc = DateTime.UtcNow
+                    };
+                    _db.PayrollComponentValues.Add(compVal);
+                }
+
+                totalEmployees++;
+            }
+
+            importedPeriodLabels.Add(period.PeriodLabel);
+        }
+
+        batch.ValidRowsImported = totalEmployees;
+        batch.Status = "Committed";
+        batch.CommittedAtUtc = DateTime.UtcNow;
+
+        if (selectedPeriods.Count > 0)
+        {
+            var lastPeriod = selectedPeriods.Last();
+            var settings = await _db.CompanySettings.FirstOrDefaultAsync();
+            if (settings != null)
+            {
+                settings.ActivePayrollMonth = lastPeriod.Month;
+                settings.ActivePayrollYear = lastPeriod.Year;
+                settings.UpdatedAtUtc = DateTime.UtcNow;
+            }
+        }
+
+        await _db.SaveChangesAsync();
+
+        await _audit.RecordAsync(
+            actorUserId,
+            actorUserName,
+            actorRole,
+            "Payroll.MultiPeriodImportCommitted",
+            "ImportBatch",
+            batch.Id.ToString(),
+            $"Imported {totalEmployees} employee records across {importedPeriodLabels.Count} period(s) [{string.Join(", ", importedPeriodLabels)}] from '{batch.SourceFileName}'.",
+            null,
+            new { batch.SourceFileName, importedPeriodLabels, totalEmployees });
+
+        return new CommitMultiPeriodResultDto
+        {
+            ImportBatchId = batch.Id,
+            FileName = batch.SourceFileName,
+            TotalPeriodsImported = importedPeriodLabels.Count,
+            TotalEmployeesImported = totalEmployees,
+            ImportedPeriodLabels = importedPeriodLabels
+        };
+    }
+
+    // ========================================================================
+    // CONTROLLED REIMPORT DIFF
+    // ========================================================================
+    public async Task<ControlledReimportDiffDto> GetControlledReimportDiffAsync(
+        Guid importBatchId,
+        int month,
+        int year,
+        string? worksheetName)
+    {
+        var batch = await _db.ImportBatches.FirstOrDefaultAsync(b => b.Id == importBatchId)
+            ?? throw new KeyNotFoundException("Import batch not found.");
+
+        var period = await _db.PayrollPeriods.FirstOrDefaultAsync(p => p.Month == month && p.Year == year);
+        var periodLabel = FormatPeriodLabel(month, year);
+
+        var preview = await AnalyzeAndPreviewAsync(importBatchId, worksheetName ?? batch.SelectedWorksheet, month, year, null);
+        var incomingRows = preview.Rows.Where(r => r.Errors.Count == 0).ToList();
+
+        var diff = new ControlledReimportDiffDto
+        {
+            ImportBatchId = importBatchId,
+            Month = month,
+            Year = year,
+            PeriodLabel = periodLabel,
+            TotalIncomingCount = incomingRows.Count
+        };
+
+        if (period == null)
+        {
+            diff.AddedCount = incomingRows.Count;
+            diff.AddedRows = incomingRows.Select(r => new ReimportDiffRowDto
+            {
+                EmployeeCode = r.EmployeeCode,
+                EmployeeName = r.EmployeeName,
+                IncomingNetSalary = r.NetSalary
+            }).ToList();
+            return diff;
+        }
+
+        var existingRecords = await _db.PayrollRecords
+            .Include(r => r.Components)
+            .Where(r => r.PayrollPeriodId == period.Id)
+            .ToDictionaryAsync(r => r.ImportedEmployeeCode.Trim().ToLowerInvariant());
+
+        foreach (var row in incomingRows)
+        {
+            var codeLower = row.EmployeeCode.Trim().ToLowerInvariant();
+            if (!existingRecords.TryGetValue(codeLower, out var existing))
+            {
+                diff.AddedCount++;
+                diff.AddedRows.Add(new ReimportDiffRowDto
+                {
+                    EmployeeCode = row.EmployeeCode,
+                    EmployeeName = row.EmployeeName,
+                    IncomingNetSalary = row.NetSalary
+                });
+            }
+            else
+            {
+                var changes = new List<string>();
+
+                decimal exNet = (existing.OverrideNetSalary ?? existing.ImportedNetSalary) ?? 0m;
+                decimal inNet = row.NetSalary ?? 0m;
+                if (Math.Abs(exNet - inNet) > 0.01m)
+                {
+                    changes.Add($"Net Salary: ₹{exNet:N2} → ₹{inNet:N2}");
+                }
+
+                decimal exGross = (existing.OverrideGrossSalary ?? existing.ImportedGrossSalary) ?? 0m;
+                decimal inGross = row.GrossSalary ?? 0m;
+                if (Math.Abs(exGross - inGross) > 0.01m)
+                {
+                    changes.Add($"Gross Salary: ₹{exGross:N2} → ₹{inGross:N2}");
+                }
+
+                decimal exDed = (existing.OverrideTotalDeductions ?? existing.ImportedTotalDeductions) ?? 0m;
+                decimal inDed = row.TotalDeductions ?? 0m;
+                if (Math.Abs(exDed - inDed) > 0.01m)
+                {
+                    changes.Add($"Total Deductions: ₹{exDed:N2} → ₹{inDed:N2}");
+                }
+
+                if (changes.Count > 0)
+                {
+                    diff.UpdatedCount++;
+                    diff.UpdatedRows.Add(new ReimportDiffRowDto
+                    {
+                        EmployeeCode = row.EmployeeCode,
+                        EmployeeName = row.EmployeeName,
+                        IncomingNetSalary = inNet,
+                        ExistingNetSalary = exNet,
+                        ChangedFields = changes
+                    });
+                }
+                else
+                {
+                    diff.UnchangedCount++;
+                    diff.UnchangedRows.Add(new ReimportDiffRowDto
+                    {
+                        EmployeeCode = row.EmployeeCode,
+                        EmployeeName = row.EmployeeName,
+                        IncomingNetSalary = inNet,
+                        ExistingNetSalary = exNet
+                    });
+                }
+            }
+        }
+
+        return diff;
+    }
+
+    // ========================================================================
+    // YEAR-WISE PAYROLL ARCHIVE LIBRARY
+    // ========================================================================
+    public async Task<List<ArchiveYearGroupDto>> GetArchiveHistoryAsync(int? filterYear = null, string? search = null)
+    {
+        var periodsWithData = await _db.PayrollPeriods
+            .Include(p => p.PayrollRecords)
+            .Where(p => p.PayrollRecords.Any())
+            .ToListAsync();
+
+        var allBatches = await _db.ImportBatches
+            .Include(b => b.PayrollPeriod)
+            .OrderByDescending(b => b.CommittedAtUtc ?? b.CreatedAtUtc)
+            .ToListAsync();
+
+        var yearsSet = new HashSet<int> { 2025, 2026, 2027 };
+        foreach (var p in periodsWithData) yearsSet.Add(p.Year);
+        foreach (var b in allBatches)
+        {
+            if (b.PayrollYear.HasValue) yearsSet.Add(b.PayrollYear.Value);
+            else if (b.PayrollPeriod != null) yearsSet.Add(b.PayrollPeriod.Year);
+        }
+
+        var years = yearsSet.OrderByDescending(y => y).ToList();
+        if (filterYear.HasValue)
+        {
+            years = years.Where(y => y == filterYear.Value).ToList();
+        }
+
+        var result = new List<ArchiveYearGroupDto>();
+
+        foreach (var y in years)
+        {
+            var yearGroup = new ArchiveYearGroupDto { Year = y };
+
+            for (int m = 1; m <= 12; m++)
+            {
+                var period = periodsWithData.FirstOrDefault(p => p.Year == y && p.Month == m);
+                bool isImported = period != null && period.PayrollRecords.Count > 0;
+                string mName = new DateTime(y, m, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+
+                var mDto = new ArchiveMonthItemDto
+                {
+                    Month = m,
+                    MonthName = mName,
+                    PeriodLabel = FormatPeriodLabel(m, y),
+                    IsImported = isImported,
+                    EmployeeCount = period?.PayrollRecords.Count ?? 0,
+                    TotalNetPayroll = period?.PayrollRecords.Sum(r => (r.OverrideNetSalary ?? r.ImportedNetSalary) ?? 0m) ?? 0m,
+                    PayrollPeriodId = period?.Id,
+                    LatestImportBatchId = period?.PayrollRecords
+                        .OrderByDescending(r => r.UpdatedAtUtc)
+                        .Select(r => r.ImportBatchId)
+                        .FirstOrDefault(),
+                    LatestImportDateUtc = period?.PayrollRecords
+                        .OrderByDescending(r => r.UpdatedAtUtc)
+                        .Select(r => (DateTime?)r.UpdatedAtUtc)
+                        .FirstOrDefault()
+                };
+                yearGroup.Months.Add(mDto);
+            }
+
+            var batchesForYear = allBatches.Where(b =>
+                (b.PayrollYear.HasValue ? b.PayrollYear.Value == y : (b.PayrollPeriod != null && b.PayrollPeriod.Year == y)));
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                batchesForYear = batchesForYear.Where(b =>
+                    b.SourceFileName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    b.SelectedWorksheet.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            foreach (var b in batchesForYear)
+            {
+                bool physExists = File.Exists(b.StoredFilePath);
+                long size = physExists ? new FileInfo(b.StoredFilePath).Length : 0;
+
+                var detectedLabels = new List<string>();
+                if (!string.IsNullOrEmpty(b.DetectedPeriodsJson) && b.DetectedPeriodsJson != "[]")
+                {
+                    try
+                    {
+                        var dps = JsonSerializer.Deserialize<List<DetectedPeriodDto>>(b.DetectedPeriodsJson);
+                        if (dps != null)
+                        {
+                            detectedLabels = dps.Select(d => d.PeriodLabel).ToList();
+                        }
+                    }
+                    catch { }
+                }
+
+                if (detectedLabels.Count == 0 && b.PayrollPeriod != null)
+                {
+                    detectedLabels.Add(b.PayrollPeriod.PeriodLabel);
+                }
+
+                yearGroup.ArchivedFiles.Add(new ArchiveFileItemDto
+                {
+                    ImportBatchId = b.Id,
+                    FileName = b.SourceFileName,
+                    FileSha256 = b.FileSha256,
+                    Year = y,
+                    Month = b.PayrollMonth ?? b.PayrollPeriod?.Month,
+                    ImportMode = b.ImportMode,
+                    SourceFileRetentionStatus = b.SourceFileRetentionStatus,
+                    PhysicalFileExists = physExists,
+                    FileSizeBytes = size,
+                    ImportDateUtc = b.CommittedAtUtc ?? b.CreatedAtUtc,
+                    ImportedBy = !string.IsNullOrWhiteSpace(b.UploadedByUserName) ? b.UploadedByUserName : "Accounts Operator",
+                    EmployeeCount = b.ValidRowsImported > 0 ? b.ValidRowsImported : b.TotalRowsDetected,
+                    Status = b.Status,
+                    DetectedPeriods = detectedLabels
+                });
+            }
+
+            result.Add(yearGroup);
+        }
+
+        return result;
+    }
+
+    // ========================================================================
+    // DOWNLOAD ORIGINAL ARCHIVED EXCEL FILE
+    // ========================================================================
+    public async Task<(byte[] Bytes, string FileName, string ContentType)> GetArchivedFileAsync(Guid importBatchId)
+    {
+        var batch = await _db.ImportBatches.FirstOrDefaultAsync(b => b.Id == importBatchId)
+            ?? throw new KeyNotFoundException("Import batch not found.");
+
+        if (batch.SourceFileRetentionStatus == "Deleted" || !File.Exists(batch.StoredFilePath))
+        {
+            throw new FileNotFoundException("The original Excel source file has been deleted from the archive or cannot be found on disk.");
+        }
+
+        var bytes = await File.ReadAllBytesAsync(batch.StoredFilePath);
+        var ext = Path.GetExtension(batch.SourceFileName).ToLowerInvariant();
+        string contentType = ext switch
+        {
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".xls" => "application/vnd.ms-excel",
+            ".csv" => "text/csv",
+            _ => "application/octet-stream"
+        };
+
+        return (bytes, batch.SourceFileName, contentType);
+    }
+
+    // ========================================================================
+    // SAFE FILE DELETION: DELETE ORIGINAL FILE ONLY (PRESERVES PAYROLL RECORDS)
+    // ========================================================================
+    public async Task<bool> DeleteArchivedFileAsync(
+        Guid importBatchId,
+        string actorUserId,
+        string actorUserName,
+        string actorRole)
+    {
+        var batch = await _db.ImportBatches.FirstOrDefaultAsync(b => b.Id == importBatchId)
+            ?? throw new KeyNotFoundException("Import batch not found.");
+
+        if (File.Exists(batch.StoredFilePath))
+        {
+            try
+            {
+                File.Delete(batch.StoredFilePath);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to delete file from disk: {ex.Message}");
+            }
+        }
+
+        batch.SourceFileRetentionStatus = "Deleted";
+        await _db.SaveChangesAsync();
+
+        await _audit.RecordAsync(
+            actorUserId,
+            actorUserName,
+            actorRole,
+            "Payroll.ArchivedFileDeleted",
+            "ImportBatch",
+            batch.Id.ToString(),
+            $"Original Excel source file '{batch.SourceFileName}' was removed from disk storage. All processed payroll records, payslips and audit history remain preserved.",
+            null,
+            new { batch.SourceFileName, batch.StoredFilePath });
+
+        return true;
+    }
+
+    // ========================================================================
+    // PROTECTED BATCH REMOVAL SAFETY CHECKS & REMOVAL (ADMIN ONLY)
+    // ========================================================================
+    public async Task<RemoveBatchSafetyCheckDto> CheckBatchRemovalSafetyAsync(Guid importBatchId)
+    {
+        var batch = await _db.ImportBatches
+            .Include(b => b.PayrollPeriod)
+            .FirstOrDefaultAsync(b => b.Id == importBatchId)
+            ?? throw new KeyNotFoundException("Import batch not found.");
+
+        int recordsCount = await _db.PayrollRecords.CountAsync(r => r.ImportBatchId == batch.Id);
+
+        int deliveredCount = await _db.EmailDeliveryAttempts
+            .CountAsync(e => e.PayrollRecord != null && e.PayrollRecord.ImportBatchId == batch.Id && e.Status == "Delivered");
+
+        bool isFinalized = batch.PayrollPeriod?.IsClosed == true;
+
+        var warnings = new List<string>();
+        if (deliveredCount > 0)
+        {
+            warnings.Add($"{deliveredCount} payslip emails have already been successfully delivered for records in this batch.");
+        }
+        if (isFinalized)
+        {
+            warnings.Add($"The payroll period '{batch.PayrollPeriod?.PeriodLabel}' is marked as Closed/Finalized.");
+        }
+
+        return new RemoveBatchSafetyCheckDto
+        {
+            CanRemove = deliveredCount == 0 && !isFinalized,
+            PayslipsDeliveredCount = deliveredCount,
+            IsPeriodFinalized = isFinalized,
+            PayrollRecordsCount = recordsCount,
+            Warnings = warnings
+        };
+    }
+
+    public async Task<bool> RemoveImportBatchAsync(
+        Guid importBatchId,
+        bool force,
+        string actorUserId,
+        string actorUserName,
+        string actorRole)
+    {
+        if (actorRole != AppRoles.Administrator)
+        {
+            throw new UnauthorizedAccessException("Only Administrators have permission to remove an imported payroll batch.");
+        }
+
+        var batch = await _db.ImportBatches
+            .Include(b => b.PayrollPeriod)
+            .FirstOrDefaultAsync(b => b.Id == importBatchId)
+            ?? throw new KeyNotFoundException("Import batch not found.");
+
+        var safety = await CheckBatchRemovalSafetyAsync(importBatchId);
+        if (!safety.CanRemove && !force)
+        {
+            throw new InvalidOperationException(
+                $"Removal blocked: {string.Join(" ", safety.Warnings)} Administrator force confirmation is required.");
+        }
+
+        if (File.Exists(batch.StoredFilePath))
+        {
+            try { File.Delete(batch.StoredFilePath); } catch { }
+        }
+
+        var records = await _db.PayrollRecords
+            .Include(r => r.Components)
+            .Where(r => r.ImportBatchId == batch.Id)
+            .ToListAsync();
+
+        if (records.Count > 0)
+        {
+            _db.PayrollComponentValues.RemoveRange(records.SelectMany(r => r.Components));
+            _db.PayrollRecords.RemoveRange(records);
+        }
+
+        _db.ImportBatches.Remove(batch);
+        await _db.SaveChangesAsync();
+
+        await _audit.RecordAsync(
+            actorUserId,
+            actorUserName,
+            actorRole,
+            "Payroll.ImportBatchRemoved",
+            "ImportBatch",
+            batch.Id.ToString(),
+            $"Administrator permanently removed import batch '{batch.SourceFileName}' and {records.Count} payroll records. Force={force}.",
+            null,
+            new { batch.SourceFileName, recordsCount = records.Count, force });
+
+        return true;
+    }
+
+    // ========================================================================
+    // SMART PERIOD DETECTION
+    // ========================================================================
+    private static readonly Dictionary<string, int> MonthNameToNumber = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["january"] = 1, ["jan"] = 1,
+        ["february"] = 2, ["feb"] = 2,
+        ["march"] = 3, ["mar"] = 3,
+        ["april"] = 4, ["apr"] = 4,
+        ["may"] = 5,
+        ["june"] = 6, ["jun"] = 6,
+        ["july"] = 7, ["jul"] = 7,
+        ["august"] = 8, ["aug"] = 8,
+        ["september"] = 9, ["sep"] = 9, ["sept"] = 9,
+        ["october"] = 10, ["oct"] = 10,
+        ["november"] = 11, ["nov"] = 11,
+        ["december"] = 12, ["dec"] = 12
+    };
+
+    private async Task<List<DetectedPeriodDto>> SmartDetectPeriodsAsync(
+        byte[] bytes,
+        string ext,
+        string originalFileName,
+        List<WorksheetSummaryDto> worksheets,
+        string importMode,
+        int inputMonth,
+        int inputYear,
+        List<int>? requestedMonths)
+    {
+        var result = new List<DetectedPeriodDto>();
+        var seenPeriods = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        int? fileYear = null;
+        var matchYear = Regex.Match(originalFileName, @"\b(20\d\d)\b");
+        if (matchYear.Success && int.TryParse(matchYear.Value, out int fy) && fy >= 2000 && fy <= 2100)
+        {
+            fileYear = fy;
+        }
+
+        int defaultYear = fileYear ?? inputYear;
+
+        if (importMode == "SingleMonth")
+        {
+            var sheet = worksheets.FirstOrDefault(w =>
+                w.Name.Contains(FormatPeriodLabel(inputMonth, inputYear).Split(' ')[0], StringComparison.OrdinalIgnoreCase))
+                ?? worksheets[0];
+
+            int empCount = Math.Max(0, sheet.RowCount - 1);
+            var period = await _db.PayrollPeriods.FirstOrDefaultAsync(p => p.Month == inputMonth && p.Year == inputYear);
+            int existing = period != null ? await _db.PayrollRecords.CountAsync(r => r.PayrollPeriodId == period.Id) : 0;
+
+            result.Add(new DetectedPeriodDto
+            {
+                Month = inputMonth,
+                Year = inputYear,
+                PeriodLabel = FormatPeriodLabel(inputMonth, inputYear),
+                WorksheetName = sheet.Name,
+                EmployeeCount = empCount,
+                HasExistingRecords = existing > 0,
+                ExistingRecordCount = existing,
+                IsSelected = true,
+                Status = existing > 0 ? "ExistingRecordsFound" : "Ready"
+            });
+            return result;
+        }
+
+        if (importMode == "FullYear")
+        {
+            int yearToUse = inputYear;
+            for (int m = 1; m <= 12; m++)
+            {
+                string mName = new DateTime(yearToUse, m, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+                string mShort = new DateTime(yearToUse, m, 1).ToString("MMM", CultureInfo.InvariantCulture);
+
+                var sheet = worksheets.FirstOrDefault(w =>
+                    w.Name.Equals(mName, StringComparison.OrdinalIgnoreCase) ||
+                    w.Name.Equals(mShort, StringComparison.OrdinalIgnoreCase) ||
+                    w.Name.Contains(mName, StringComparison.OrdinalIgnoreCase) ||
+                    w.Name.Contains(mShort, StringComparison.OrdinalIgnoreCase))
+                    ?? (worksheets.Count == 1 ? worksheets[0] : null);
+
+                if (sheet != null)
+                {
+                    int empCount = Math.Max(0, sheet.RowCount - 1);
+                    var period = await _db.PayrollPeriods.FirstOrDefaultAsync(p => p.Month == m && p.Year == yearToUse);
+                    int existing = period != null ? await _db.PayrollRecords.CountAsync(r => r.PayrollPeriodId == period.Id) : 0;
+
+                    result.Add(new DetectedPeriodDto
+                    {
+                        Month = m,
+                        Year = yearToUse,
+                        PeriodLabel = FormatPeriodLabel(m, yearToUse),
+                        WorksheetName = sheet.Name,
+                        EmployeeCount = empCount,
+                        HasExistingRecords = existing > 0,
+                        ExistingRecordCount = existing,
+                        IsSelected = true,
+                        Status = existing > 0 ? "ExistingRecordsFound" : "Ready"
+                    });
+                }
+            }
+
+            if (result.Count == 0 && worksheets.Count > 0)
+            {
+                var sheet = worksheets[0];
+                int empCount = Math.Max(0, sheet.RowCount - 1);
+                result.Add(new DetectedPeriodDto
+                {
+                    Month = inputMonth,
+                    Year = yearToUse,
+                    PeriodLabel = FormatPeriodLabel(inputMonth, yearToUse),
+                    WorksheetName = sheet.Name,
+                    EmployeeCount = empCount,
+                    IsSelected = true,
+                    Status = "Ready"
+                });
+            }
+            return result;
+        }
+
+        if (importMode == "MultipleMonths")
+        {
+            var monthsToProcess = (requestedMonths != null && requestedMonths.Count > 0)
+                ? requestedMonths
+                : new List<int> { inputMonth };
+
+            foreach (var m in monthsToProcess.OrderBy(x => x))
+            {
+                string mName = new DateTime(inputYear, m, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+                string mShort = new DateTime(inputYear, m, 1).ToString("MMM", CultureInfo.InvariantCulture);
+
+                var sheet = worksheets.FirstOrDefault(w =>
+                    w.Name.Equals(mName, StringComparison.OrdinalIgnoreCase) ||
+                    w.Name.Equals(mShort, StringComparison.OrdinalIgnoreCase) ||
+                    w.Name.Contains(mName, StringComparison.OrdinalIgnoreCase) ||
+                    w.Name.Contains(mShort, StringComparison.OrdinalIgnoreCase))
+                    ?? worksheets[0];
+
+                int empCount = Math.Max(0, sheet.RowCount - 1);
+                var period = await _db.PayrollPeriods.FirstOrDefaultAsync(p => p.Month == m && p.Year == inputYear);
+                int existing = period != null ? await _db.PayrollRecords.CountAsync(r => r.PayrollPeriodId == period.Id) : 0;
+
+                result.Add(new DetectedPeriodDto
+                {
+                    Month = m,
+                    Year = inputYear,
+                    PeriodLabel = FormatPeriodLabel(m, inputYear),
+                    WorksheetName = sheet.Name,
+                    EmployeeCount = empCount,
+                    HasExistingRecords = existing > 0,
+                    ExistingRecordCount = existing,
+                    IsSelected = true,
+                    Status = existing > 0 ? "ExistingRecordsFound" : "Ready"
+                });
+            }
+            return result;
+        }
+
+        // AutoDetect mode
+        foreach (var ws in worksheets)
+        {
+            int? detectedMonth = null;
+            int? detectedYear = null;
+
+            var sheetYearMatch = Regex.Match(ws.Name, @"\b(20\d\d)\b");
+            if (sheetYearMatch.Success && int.TryParse(sheetYearMatch.Value, out int sy))
+            {
+                detectedYear = sy;
+            }
+
+            foreach (var kvp in MonthNameToNumber)
+            {
+                if (Regex.IsMatch(ws.Name, $@"\b{kvp.Key}\b", RegexOptions.IgnoreCase))
+                {
+                    detectedMonth = kvp.Value;
+                    break;
+                }
+            }
+
+            int finalYear = detectedYear ?? fileYear ?? inputYear;
+            int finalMonth = detectedMonth ?? inputMonth;
+
+            string key = $"{finalYear}-{finalMonth}";
+            if (!seenPeriods.Contains(key))
+            {
+                seenPeriods.Add(key);
+                int empCount = Math.Max(0, ws.RowCount - 1);
+                var period = await _db.PayrollPeriods.FirstOrDefaultAsync(p => p.Month == finalMonth && p.Year == finalYear);
+                int existing = period != null ? await _db.PayrollRecords.CountAsync(r => r.PayrollPeriodId == period.Id) : 0;
+
+                result.Add(new DetectedPeriodDto
+                {
+                    Month = finalMonth,
+                    Year = finalYear,
+                    PeriodLabel = FormatPeriodLabel(finalMonth, finalYear),
+                    WorksheetName = ws.Name,
+                    EmployeeCount = empCount,
+                    HasExistingRecords = existing > 0,
+                    ExistingRecordCount = existing,
+                    IsSelected = true,
+                    Status = existing > 0 ? "ExistingRecordsFound" : "Ready"
+                });
+            }
+        }
+
+        if (result.Count == 0 && worksheets.Count > 0)
+        {
+            var sheet = worksheets[0];
+            result.Add(new DetectedPeriodDto
+            {
+                Month = inputMonth,
+                Year = defaultYear,
+                PeriodLabel = FormatPeriodLabel(inputMonth, defaultYear),
+                WorksheetName = sheet.Name,
+                EmployeeCount = Math.Max(0, sheet.RowCount - 1),
+                IsSelected = true,
+                Status = "Ready"
+            });
+        }
+
+        return result;
     }
 
     // ========================================================================

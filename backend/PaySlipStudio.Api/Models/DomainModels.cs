@@ -213,6 +213,17 @@ public class ImportBatch
     [MaxLength(40)]
     public string Status { get; set; } = "Staged"; // "Staged", "Committed", "Replaced"
 
+    [MaxLength(50)]
+    public string ImportMode { get; set; } = "SingleMonth"; // "SingleMonth", "FullYear", "MultipleMonths", "AutoDetect"
+
+    [MaxLength(50)]
+    public string SourceFileRetentionStatus { get; set; } = "Retained"; // "Retained", "Deleted"
+
+    public int? PayrollYear { get; set; }
+    public int? PayrollMonth { get; set; }
+
+    public string DetectedPeriodsJson { get; set; } = "[]";
+
     [MaxLength(128)]
     public string UploadedByUserId { get; set; } = string.Empty;
 

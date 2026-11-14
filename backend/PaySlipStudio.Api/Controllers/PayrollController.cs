@@ -98,10 +98,35 @@ public class PayrollController : ControllerBase
     // ========================================================================
     [HttpPost("import/upload")]
     [Authorize(Roles = $"{AppRoles.Administrator},{AppRoles.AccountsOperator}")]
-    public async Task<IActionResult> UploadExcelFile([FromForm] IFormFile file, [FromForm] int month, [FromForm] int year)
+    public async Task<IActionResult> UploadExcelFile(
+        [FromForm] IFormFile file,
+        [FromForm] int month,
+        [FromForm] int year,
+        [FromForm] string? importMode = "SingleMonth",
+        [FromForm] string? requestedMonths = null)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "Please select a valid .xlsx, .xls, or .csv file to upload." });
+
+        List<int>? parsedMonths = null;
+        if (!string.IsNullOrWhiteSpace(requestedMonths))
+        {
+            try
+            {
+                if (requestedMonths.TrimStart().StartsWith("["))
+                {
+                    parsedMonths = System.Text.Json.JsonSerializer.Deserialize<List<int>>(requestedMonths);
+                }
+                else
+                {
+                    parsedMonths = requestedMonths.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => int.TryParse(s.Trim(), out int val) ? val : 0)
+                        .Where(val => val >= 1 && val <= 12)
+                        .ToList();
+                }
+            }
+            catch { }
+        }
 
         try
         {
@@ -112,7 +137,9 @@ public class PayrollController : ControllerBase
                 month,
                 year,
                 CurrentUserId,
-                CurrentUserName);
+                CurrentUserName,
+                importMode ?? "SingleMonth",
+                parsedMonths);
 
             return Ok(summary);
         }
@@ -122,7 +149,7 @@ public class PayrollController : ControllerBase
         }
     }
 
-    public record LoadWorkspaceMockRequest(int Month, int Year);
+    public record LoadWorkspaceMockRequest(int Month, int Year, string? ImportMode = "SingleMonth", List<int>? RequestedMonths = null);
 
     [HttpPost("import/load-workspace-mock")]
     [Authorize(Roles = $"{AppRoles.Administrator},{AppRoles.AccountsOperator}")]
@@ -148,7 +175,9 @@ public class PayrollController : ControllerBase
             req.Month,
             req.Year,
             CurrentUserId,
-            CurrentUserName);
+            CurrentUserName,
+            req.ImportMode ?? "SingleMonth",
+            req.RequestedMonths);
 
         return Ok(summary);
     }
@@ -204,6 +233,116 @@ public class PayrollController : ControllerBase
                 worksheet = committed.SelectedWorksheet,
                 committedAtUtc = committed.CommittedAtUtc
             });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    public record ReimportDiffRequest(int Month, int Year, string? WorksheetName);
+
+    [HttpPost("import/{batchId:guid}/reimport-diff")]
+    [Authorize(Roles = $"{AppRoles.Administrator},{AppRoles.AccountsOperator}")]
+    public async Task<IActionResult> GetReimportDiff(Guid batchId, [FromBody] ReimportDiffRequest req)
+    {
+        try
+        {
+            var diff = await _excelService.GetControlledReimportDiffAsync(batchId, req.Month, req.Year, req.WorksheetName);
+            return Ok(diff);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("import/{batchId:guid}/commit-multi")]
+    [Authorize(Roles = $"{AppRoles.Administrator},{AppRoles.AccountsOperator}")]
+    public async Task<IActionResult> CommitMultiPeriod(Guid batchId, [FromBody] CommitMultiPeriodRequest req)
+    {
+        try
+        {
+            var res = await _excelService.CommitMultiPeriodBatchAsync(
+                batchId,
+                req.SelectedPeriods,
+                req.AllowReplaceExisting,
+                CurrentUserId,
+                CurrentUserName,
+                CurrentUserRole);
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("import/archive")]
+    [Authorize(Roles = $"{AppRoles.Administrator},{AppRoles.AccountsOperator},{AppRoles.Viewer}")]
+    public async Task<IActionResult> GetArchiveHistory([FromQuery] int? year = null, [FromQuery] string? search = null)
+    {
+        var archive = await _excelService.GetArchiveHistoryAsync(year, search);
+        return Ok(archive);
+    }
+
+    [HttpGet("import/archive/{batchId:guid}/download")]
+    [Authorize(Roles = $"{AppRoles.Administrator},{AppRoles.AccountsOperator},{AppRoles.Viewer}")]
+    public async Task<IActionResult> DownloadArchivedFile(Guid batchId)
+    {
+        try
+        {
+            var (bytes, fileName, contentType) = await _excelService.GetArchivedFileAsync(batchId);
+            return File(bytes, contentType, fileName);
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("import/archive/{batchId:guid}/file")]
+    [Authorize(Roles = $"{AppRoles.Administrator},{AppRoles.AccountsOperator}")]
+    public async Task<IActionResult> DeleteArchivedFile(Guid batchId)
+    {
+        try
+        {
+            await _excelService.DeleteArchivedFileAsync(batchId, CurrentUserId, CurrentUserName, CurrentUserRole);
+            return Ok(new { message = "Original Excel file successfully deleted from archive. Payroll records remain preserved." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("import/archive/{batchId:guid}/safety")]
+    [Authorize(Roles = $"{AppRoles.Administrator}")]
+    public async Task<IActionResult> CheckBatchSafety(Guid batchId)
+    {
+        try
+        {
+            var safety = await _excelService.CheckBatchRemovalSafetyAsync(batchId);
+            return Ok(safety);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("import/archive/{batchId:guid}/batch")]
+    [Authorize(Roles = $"{AppRoles.Administrator}")]
+    public async Task<IActionResult> RemoveImportBatch(Guid batchId, [FromQuery] bool force = false)
+    {
+        try
+        {
+            await _excelService.RemoveImportBatchAsync(batchId, force, CurrentUserId, CurrentUserName, CurrentUserRole);
+            return Ok(new { message = "Import batch and associated payroll records successfully removed." });
         }
         catch (Exception ex)
         {

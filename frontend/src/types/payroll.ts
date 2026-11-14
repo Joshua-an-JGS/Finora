@@ -314,6 +314,77 @@ export interface WorksheetSummaryDto {
   sampleHeaders: string[];
 }
 
+export type ImportPeriodMode = 'SingleMonth' | 'FullYear' | 'MultipleMonths' | 'AutoDetect';
+
+export interface DetectedPeriodDto {
+  month: number;
+  year: number;
+  periodLabel: string;
+  worksheetName: string;
+  employeeCount: number;
+  hasExistingRecords: boolean;
+  existingRecordCount: number;
+  isSelected: boolean;
+  status: string;
+}
+
+export interface ControlledReimportDiffDto {
+  importBatchId: string;
+  month: number;
+  year: number;
+  periodLabel: string;
+  addedCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  totalIncomingCount: number;
+  addedRows: ReimportDiffRowDto[];
+  updatedRows: ReimportDiffRowDto[];
+  unchangedRows: ReimportDiffRowDto[];
+}
+
+export interface ReimportDiffRowDto {
+  employeeCode: string;
+  employeeName: string;
+  incomingNetSalary?: number | null;
+  existingNetSalary?: number | null;
+  changedFields?: string[];
+}
+
+export interface ArchiveYearGroupDto {
+  year: number;
+  months: ArchiveMonthItemDto[];
+  archivedFiles: ArchiveFileItemDto[];
+}
+
+export interface ArchiveMonthItemDto {
+  month: number;
+  monthName: string;
+  periodLabel: string;
+  isImported: boolean;
+  employeeCount: number;
+  totalNetPayroll: number;
+  payrollPeriodId?: string | null;
+  latestImportBatchId?: string | null;
+  latestImportDateUtc?: string | null;
+}
+
+export interface ArchiveFileItemDto {
+  importBatchId: string;
+  fileName: string;
+  fileSha256: string;
+  year: number;
+  month?: number | null;
+  importMode: string;
+  sourceFileRetentionStatus: 'Retained' | 'Deleted';
+  physicalFileExists: boolean;
+  fileSizeBytes: number;
+  importDateUtc: string;
+  importedBy: string;
+  employeeCount: number;
+  status: string;
+  detectedPeriods: string[];
+}
+
 export interface ExcelUploadSummaryDto {
   importBatchId: string;
   fileName: string;
@@ -326,6 +397,12 @@ export interface ExcelUploadSummaryDto {
   selectedWorksheet: string;
   hasExistingRecordsForPeriod: boolean;
   existingRecordCountForPeriod: number;
+  importMode?: string;
+  detectedPeriods?: DetectedPeriodDto[];
+  totalEmployeesDetected?: number;
+  isDuplicateFile?: boolean;
+  previousImportBatchId?: string | null;
+  previousImportDateUtc?: string | null;
 }
 
 export interface ColumnMappingDefinitionDto {

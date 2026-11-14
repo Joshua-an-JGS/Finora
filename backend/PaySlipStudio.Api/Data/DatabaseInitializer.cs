@@ -41,6 +41,11 @@ public static class DatabaseInitializer
                 ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""CompanySetupCompleted"" boolean DEFAULT false;
                 ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""AdminRecoveryKeyHash"" character varying(128);
                 ALTER TABLE ""CompanySettings"" ADD COLUMN IF NOT EXISTS ""AdminRecoveryKeyGeneratedAtUtc"" timestamp with time zone;
+                ALTER TABLE ""ImportBatches"" ADD COLUMN IF NOT EXISTS ""ImportMode"" character varying(50) DEFAULT 'SingleMonth';
+                ALTER TABLE ""ImportBatches"" ADD COLUMN IF NOT EXISTS ""SourceFileRetentionStatus"" character varying(50) DEFAULT 'Retained';
+                ALTER TABLE ""ImportBatches"" ADD COLUMN IF NOT EXISTS ""PayrollYear"" integer;
+                ALTER TABLE ""ImportBatches"" ADD COLUMN IF NOT EXISTS ""PayrollMonth"" integer;
+                ALTER TABLE ""ImportBatches"" ADD COLUMN IF NOT EXISTS ""DetectedPeriodsJson"" text DEFAULT '[]';
             ");
         }
         else if (db.Database.IsSqlite())
@@ -415,6 +420,27 @@ Accounts & Finance Department
         if (existingPayrollCols.Count > 0 && !existingPayrollCols.Contains("OverrideEmployeeCode"))
         {
             await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"PayrollRecords\" ADD COLUMN \"OverrideEmployeeCode\" TEXT NULL;");
+        }
+
+        var existingBatchCols = await GetSqliteColumnNamesAsync(db, "ImportBatches");
+        if (existingBatchCols.Count > 0)
+        {
+            var batchCols = new (string Name, string TypeSql)[]
+            {
+                ("ImportMode", "TEXT NOT NULL DEFAULT 'SingleMonth'"),
+                ("SourceFileRetentionStatus", "TEXT NOT NULL DEFAULT 'Retained'"),
+                ("PayrollYear", "INTEGER NULL"),
+                ("PayrollMonth", "INTEGER NULL"),
+                ("DetectedPeriodsJson", "TEXT NOT NULL DEFAULT '[]'")
+            };
+
+            foreach (var (colName, colDef) in batchCols)
+            {
+                if (!existingBatchCols.Contains(colName))
+                {
+                    await db.Database.ExecuteSqlRawAsync($"ALTER TABLE \"ImportBatches\" ADD COLUMN \"{colName}\" {colDef};");
+                }
+            }
         }
     }
 
