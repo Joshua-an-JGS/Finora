@@ -32,7 +32,13 @@ export interface PayslipTemplateConfig {
   headerAlignment: 'Left' | 'Center' | 'Split';
   documentTitle: string;
   payslipTitleAlignment?: 'Left' | 'Center' | 'Right';
-  employeeDetailsSectionHeading?: string;
+  titleBannerFontSizePt?: number;
+  titleBannerFontWeight?: string;
+  titleBannerTopSpacingPx?: number;
+  titleBannerBottomSpacingPx?: number;
+  showTitleBannerDivider?: boolean;
+  titleBannerDividerThicknessPt?: number;
+  titleBannerDividerColor?: string | null;
   periodPresentationPrefix: string;
   showCompanySubtitle: boolean;
   showCompanyAddress: boolean;
@@ -51,6 +57,21 @@ export interface PayslipTemplateConfig {
   overrideCompanyPhone?: string | null;
   overrideCompanyWebsite?: string | null;
   overrideLogoDataUrl?: string | null;
+
+  // Employee Details Section & Heading Controls
+  showEmployeeDetailsHeading?: boolean;
+  employeeDetailsSectionHeading?: string;
+  employeeDetailsHeadingAlignment?: 'Left' | 'Center' | 'Right';
+  employeeDetailsHeadingFontSizePt?: number;
+  employeeDetailsHeadingFontWeight?: string;
+  employeeDetailsHeadingTextColor?: string | null;
+  employeeDetailsHeadingBgColor?: string | null;
+  employeeDetailsHeadingTopSpacingPx?: number;
+  employeeDetailsHeadingBottomSpacingPx?: number;
+  showEmployeeDetailsHeadingBorder?: boolean;
+  employeeDetailsHeadingBorderColor?: string | null;
+  employeeDetailsHeadingBorderThicknessPt?: number;
+  employeeDetailsSectionPaddingPx?: number;
 
   employeeDetailsColumns: number;
   showEmployeeId: boolean;

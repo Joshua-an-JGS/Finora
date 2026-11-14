@@ -79,16 +79,19 @@ var effectiveProvider = isDesktopMode ? "Sqlite" : configuredProvider;
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (string.Equals(effectiveProvider, "Sqlite", StringComparison.OrdinalIgnoreCase))
+    var customConn = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrWhiteSpace(customConn))
+    {
+        options.UseSqlite(customConn);
+    }
+    else if (string.Equals(effectiveProvider, "Sqlite", StringComparison.OrdinalIgnoreCase))
     {
         var sqliteDbPath = Path.Combine(dataDir, "finora.db");
         options.UseSqlite($"Data Source={sqliteDbPath}");
     }
     else
     {
-        var connStr = builder.Configuration.GetConnectionString("DefaultConnection")
-                      ?? $"Data Source={Path.Combine(dataDir, "finora.db")}";
-        options.UseSqlite(connStr);
+        options.UseSqlite($"Data Source={Path.Combine(dataDir, "finora.db")}");
     }
 });
 

@@ -85,7 +85,8 @@ public class EmailDeliveryService
         string actorUserName,
         string actorRole)
     {
-        if (string.IsNullOrWhiteSpace(recipientEmail) || !recipientEmail.Contains('@'))
+        // 1. Validate Recipient Email
+        if (string.IsNullOrWhiteSpace(recipientEmail) || !recipientEmail.Contains('@') || !recipientEmail.Contains('.'))
         {
             throw new InvalidOperationException("A valid recipient email address is required.");
         }
@@ -96,6 +97,16 @@ public class EmailDeliveryService
             throw new InvalidOperationException("Multiple recipients are prohibited. Send separate messages for separate employees.");
         }
 
+        // 2. Validate Subject and Message Body
+        if (string.IsNullOrWhiteSpace(subject?.Trim()))
+        {
+            throw new InvalidOperationException("Email subject cannot be empty.");
+        }
+        if (string.IsNullOrWhiteSpace(body?.Trim()))
+        {
+            throw new InvalidOperationException("Email message body cannot be empty.");
+        }
+
         var record = await _db.PayrollRecords
             .Include(r => r.Employee)
             .Include(r => r.PayrollPeriod)
@@ -103,6 +114,16 @@ public class EmailDeliveryService
             .Include(r => r.GeneratedDocuments)
             .FirstOrDefaultAsync(r => r.Id == payrollRecordId)
             ?? throw new KeyNotFoundException("Payroll record not found.");
+
+        // 3. Verify Employee and Payroll Period
+        if (record.Employee == null || string.IsNullOrWhiteSpace(record.ImportedEmployeeName))
+        {
+            throw new InvalidOperationException("Selected payroll record is missing associated employee information.");
+        }
+        if (record.PayrollPeriod == null || record.PayrollPeriod.Month < 1 || record.PayrollPeriod.Month > 12)
+        {
+            throw new InvalidOperationException("Selected payroll record is missing a valid payroll period.");
+        }
 
         var companySettings = await _db.CompanySettings.FirstOrDefaultAsync() ?? new CompanySettings();
         PayslipTemplate? template = null;
@@ -115,6 +136,15 @@ public class EmailDeliveryService
         var docModel = _resolver.ResolveDocument(record, companySettings, template);
         var (resolvedSubject, resolvedBody) = ResolvePlaceholders(subject, body, docModel);
 
+        if (string.IsNullOrWhiteSpace(resolvedSubject?.Trim()))
+        {
+            throw new InvalidOperationException("Resolved email subject cannot be empty.");
+        }
+        if (string.IsNullOrWhiteSpace(resolvedBody?.Trim()))
+        {
+            throw new InvalidOperationException("Resolved email message body cannot be empty.");
+        }
+
         // Always generate or verify the latest PDF for this exact employee and payroll period
         var (pdfDoc, pdfBytes) = await _pdfService.GenerateAndPersistPdfAsync(
             record.Id,
@@ -122,10 +152,16 @@ public class EmailDeliveryService
             actorUserName,
             actorRole);
 
-        // Strict verification that the attached PDF belongs to this employee and period
+        // 4. Strict verification that the attached PDF belongs to this employee and period
         if (pdfDoc.EmployeeId != record.EmployeeId || pdfDoc.PayrollPeriodId != record.PayrollPeriodId)
         {
             throw new InvalidOperationException("Security integrity error: PDF attachment does not match the selected employee or payroll period.");
+        }
+
+        // 5. Verify that the attachment exists on disk
+        if (pdfBytes == null || pdfBytes.Length == 0 || !File.Exists(pdfDoc.StoredFilePath))
+        {
+            throw new InvalidOperationException($"Generated payslip PDF attachment file '{pdfDoc.FileName}' could not be located on disk.");
         }
 
         string shortHash = pdfDoc.Sha256Hash.Length > 16 ? pdfDoc.Sha256Hash[..16] : pdfDoc.Sha256Hash;

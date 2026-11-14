@@ -157,7 +157,8 @@ public class PaySlipStudioAcceptanceTests
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["Database:Provider"] = "Sqlite",
-                        ["ConnectionStrings:DefaultConnection"] = $"Data Source={dbFile}"
+                        ["ConnectionStrings:DefaultConnection"] = $"Data Source={dbFile}",
+                        ["BootstrapAdmin:ForceSeed"] = "true"
                     });
                 });
             });

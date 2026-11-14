@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Search,
   Save,
@@ -36,6 +36,9 @@ import {
   Building2,
   Table,
   TableProperties,
+  Mail,
+  Users,
+  Type,
 } from 'lucide-react';
 import { apiRequest, getAuthorizedDownloadUrl } from '../services/api';
 import type {
@@ -198,6 +201,10 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
     resolvedBody: string;
     attachmentName: string;
   } | null>(null);
+  const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
+  const [lastPopulatedRecordId, setLastPopulatedRecordId] = useState<string | null>(null);
+  const [showSaveEmailTemplateModal, setShowSaveEmailTemplateModal] = useState(false);
+  const [newEmailTemplateName, setNewEmailTemplateName] = useState('');
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSuccessMsg, setModalSuccessMsg] = useState<string | null>(null);
@@ -212,6 +219,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
   // Collapsible Template & Layout Sections
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     header: false,
+    heading: false,
+    employeeDetails: false,
     layout: false,
     typography: false,
     color: false,
@@ -649,15 +658,19 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
       str
         .replace(/\{\{EmployeeName\}\}/gi, liveResolvedDocument.employeeName)
         .replace(/\{\{EmployeeId\}\}/gi, liveResolvedDocument.employeeCode)
+        .replace(/\{\{EmployeeID\}\}/gi, liveResolvedDocument.employeeCode)
         .replace(/\{\{PayrollMonth\}\}/gi, monthName)
         .replace(/\{\{PayrollYear\}\}/gi, yearStr)
         .replace(/\{\{CompanyName\}\}/gi, liveResolvedDocument.companyName)
         .replace(/\{\{NetSalary\}\}/gi, netStr);
 
+    const safeCode = (liveResolvedDocument.employeeCode || 'EMP').replace(/\s+/g, '_');
+    const periodSlug = `${monthName}_${yearStr}`.replace(/\s+/g, '_');
+
     setEmailPreviewData({
       resolvedSubject: applyTokens(emailSubject),
       resolvedBody: applyTokens(emailBody),
-      attachmentName: `Payslip_${liveResolvedDocument.employeeCode}_${liveResolvedDocument.periodLabel.replace(/\s+/g, '_')}.pdf`,
+      attachmentName: `Payslip_${safeCode}_${periodSlug}.pdf`,
     });
   }, [liveResolvedDocument, emailSubject, emailBody]);
 
@@ -1390,28 +1403,39 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
     }
   };
 
+  // Auto-generate default dynamic subject and message body
+  const getDynamicDefaultEmailSubject = useCallback((doc: PayslipDocumentModel) => {
+    const monthName = MONTHS.find((m) => m.value === doc.payrollMonth)?.label || '';
+    const yearStr = String(doc.payrollYear);
+    const empName = doc.employeeName || '';
+    const empCode = doc.employeeCode || '';
+    return `Your Payslip for ${monthName} ${yearStr} — ${empName} (${empCode})`;
+  }, []);
+
+  const getDynamicDefaultEmailBody = useCallback((doc: PayslipDocumentModel) => {
+    const monthName = MONTHS.find((m) => m.value === doc.payrollMonth)?.label || '';
+    const yearStr = String(doc.payrollYear);
+    const empName = doc.employeeName || '';
+    const company = (doc.companyName || '').trim();
+    return `Dear ${empName},\n\nPlease find attached your payslip for ${monthName} ${yearStr}.\n\nPlease review the document and contact the Accounts Department if you have any questions regarding your salary details.\n\nRegards,\nAccounts Department\n${company}`;
+  }, []);
+
   // Fetch current SMTP configuration and auto-populate email fields whenever Send Payslip modal opens
   useEffect(() => {
     if (!showSendModal || !liveResolvedDocument) return;
     setModalError(null);
     setModalSuccessMsg(null);
 
-    // Auto-populate recipient email
-    setEmailRecipient(liveResolvedDocument.employeeEmail || '');
+    const currentRecId = liveResolvedDocument.payrollRecordId;
+    const hasEmployeeChanged = lastPopulatedRecordId !== currentRecId;
 
-    // Auto-generate resolved subject and body from payroll data
-    const monthName = MONTHS.find((m) => m.value === liveResolvedDocument.payrollMonth)?.label || '';
-    const yearStr = String(liveResolvedDocument.payrollYear);
-    const empName = liveResolvedDocument.employeeName || '';
-    const empCode = liveResolvedDocument.employeeCode || '';
-    const company = liveResolvedDocument.companyName || '';
-
-    setEmailSubject(
-      `Your Payslip for ${monthName} ${yearStr} — ${empName} (${empCode})`
-    );
-    setEmailBody(
-      `Dear ${empName},\n\nPlease find attached your payslip for ${monthName} ${yearStr}.\n\nPlease review the document and contact the Accounts Department if you have any questions regarding your salary details.\n\nRegards,\nAccounts Department\n${company}`
-    );
+    if (hasEmployeeChanged || !emailManuallyEdited) {
+      setEmailRecipient(liveResolvedDocument.employeeEmail || '');
+      setEmailSubject(getDynamicDefaultEmailSubject(liveResolvedDocument));
+      setEmailBody(getDynamicDefaultEmailBody(liveResolvedDocument));
+      setLastPopulatedRecordId(currentRecId);
+      setEmailManuallyEdited(false);
+    }
 
     apiRequest<any>('/api/settings/company')
       .then((s) => {
@@ -1422,14 +1446,110 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
         // Settings may be restricted for this role; let the server decide on send.
         setSmtpConfigured(true);
       });
-  }, [showSendModal, liveResolvedDocument]);
+  }, [showSendModal, liveResolvedDocument, lastPopulatedRecordId, emailManuallyEdited, getDynamicDefaultEmailSubject, getDynamicDefaultEmailBody]);
+
+  const handleResetEmailToDefault = () => {
+    if (!liveResolvedDocument) return;
+    setEmailRecipient(liveResolvedDocument.employeeEmail || '');
+    setEmailSubject(getDynamicDefaultEmailSubject(liveResolvedDocument));
+    setEmailBody(getDynamicDefaultEmailBody(liveResolvedDocument));
+    setEmailManuallyEdited(false);
+    setModalSuccessMsg('Reset email subject and message to dynamic default.');
+    setTimeout(() => setModalSuccessMsg(null), 3000);
+  };
+
+  const handleSaveCustomEmailTemplate = async () => {
+    if (!newEmailTemplateName.trim()) {
+      setModalError('Please enter a template name.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await apiRequest<EmailTemplateItem>('/api/templates/email', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newEmailTemplateName.trim(),
+          subjectTemplate: emailSubject,
+          bodyTemplate: emailBody,
+          isDefault: false,
+        }),
+      });
+      setEmailTemplates((prev) => [...prev, created]);
+      setSelectedEmailTemplateId(created.id);
+      setShowSaveEmailTemplateModal(false);
+      setNewEmailTemplateName('');
+      setModalSuccessMsg(`Template '${created.name}' saved successfully!`);
+      setTimeout(() => setModalSuccessMsg(null), 3000);
+    } catch (err: any) {
+      setModalError(err.message || 'Failed to save email template.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSendEmail = async (isTest: boolean) => {
-    if (!serverDoc) return;
+    if (!serverDoc || !liveResolvedDocument) return;
     setSaving(true);
     setFeedback(null);
     setModalError(null);
     setModalSuccessMsg(null);
+
+    // 1. Validate recipient email
+    const recipient = emailRecipient.trim();
+    if (!recipient) {
+      setModalError('Please enter a recipient email address.');
+      setSaving(false);
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipient)) {
+      setModalError('Please enter a valid recipient email address (e.g. employee@organization.com).');
+      setSaving(false);
+      return;
+    }
+    if (recipient.includes(',') || recipient.includes(';')) {
+      setModalError('Multiple recipients are prohibited. Each employee payslip must be dispatched separately.');
+      setSaving(false);
+      return;
+    }
+
+    // 2. Validate subject
+    const subjectToSend = (emailPreviewData?.resolvedSubject || emailSubject).trim();
+    if (!subjectToSend) {
+      setModalError('Email subject cannot be empty.');
+      setSaving(false);
+      return;
+    }
+
+    // 3. Validate message body
+    const bodyToSend = (emailPreviewData?.resolvedBody || emailBody).trim();
+    if (!bodyToSend) {
+      setModalError('Email message body cannot be empty.');
+      setSaving(false);
+      return;
+    }
+
+    // 4. Verify correct employee is selected
+    if (!liveResolvedDocument.employeeId || !liveResolvedDocument.employeeName) {
+      setModalError('No valid employee is selected for payslip dispatch.');
+      setSaving(false);
+      return;
+    }
+
+    // 5. Verify correct payroll period
+    if (!liveResolvedDocument.payrollMonth || !liveResolvedDocument.payrollYear) {
+      setModalError('Payroll period information is missing on the selected payslip.');
+      setSaving(false);
+      return;
+    }
+
+    // 6. Verify sender configuration if sending live email
+    if (!isTest && !smtpConfigured) {
+      setModalError('Email sender is not configured yet. Please configure SMTP in Settings or Admin Console before dispatching live payslips.');
+      setSaving(false);
+      return;
+    }
+
     try {
       if (dirty && canEdit) {
         await handleSaveDraft();
@@ -1438,9 +1558,9 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
         method: 'POST',
         body: JSON.stringify({
           payrollRecordId: serverDoc.payrollRecordId,
-          recipientEmail: emailRecipient,
-          subject: emailSubject,
-          body: emailBody,
+          recipientEmail: recipient,
+          subject: subjectToSend,
+          body: bodyToSend,
           isTestEmail: isTest,
         }),
       });
@@ -3479,7 +3599,716 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 2. Page & Layout */}
+                  {/* 2. Payslip Main Heading */}
+                  <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('heading')}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-[#FFFFFF] hover:bg-[#F8F9FA] transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Type className="w-4 h-4 text-[#F47721]" />
+                        <span className="text-[14.5px] font-semibold text-[#1F2937]">
+                          2. Payslip Main Heading
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-[#6B7280]">
+                          {collapsedSections.heading ? 'Expand' : 'Collapse'}
+                        </span>
+                        {collapsedSections.heading ? (
+                          <ChevronRight className="w-4 h-4 text-[#6B7280]" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-[#6B7280]" />
+                        )}
+                      </div>
+                    </button>
+
+                    {!collapsedSections.heading && (
+                      <div className="p-4 border-t border-[#E5E7EB] space-y-4">
+                        {/* Heading Alignment */}
+                        <div className="space-y-1.5">
+                          <label className="block text-[11.5px] font-medium text-[#1F2937]">
+                            Payslip Heading Alignment
+                          </label>
+                          <div className="flex gap-1.5">
+                            {(['Left', 'Center', 'Right'] as const).map((align) => (
+                              <button
+                                key={align}
+                                type="button"
+                                onClick={() => {
+                                  setDirty(true);
+                                  setStyleEdit({ ...styleEdit, payslipTitleAlignment: align });
+                                }}
+                                className={`flex-1 py-1.5 rounded-[6px] text-[12px] font-medium border transition-colors cursor-pointer ${
+                                  (styleEdit.payslipTitleAlignment || 'Left') === align
+                                    ? 'bg-[#F47721] border-[#F47721] text-white'
+                                    : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-[#F47721] hover:text-[#F47721]'
+                                }`}
+                              >
+                                {align === 'Left' ? 'Left (Split)' : align === 'Center' ? 'Center (Unified)' : 'Right'}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[11px] text-[#6B7280]">
+                            {(styleEdit.payslipTitleAlignment || 'Left') === 'Left'
+                              ? 'Left: Preserves split layout with title on the left and payroll month/year on the right.'
+                              : (styleEdit.payslipTitleAlignment || 'Left') === 'Center'
+                              ? 'Center: Displays complete heading together centrally as one unified banner (e.g. PAYSLIP FOR THE MONTH OF NOVEMBER 2026).'
+                              : 'Right: Displays combined heading aligned to the right.'}
+                          </p>
+                        </div>
+
+                        {/* Title & Prefix text */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Document Title
+                            </label>
+                            <input
+                              type="text"
+                              value={styleEdit.documentTitle || 'PAYSLIP'}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({ ...styleEdit, documentTitle: e.target.value });
+                              }}
+                              className="w-full px-2.5 py-1.5 text-[12.5px] border border-[#E5E7EB] rounded-[6px] focus:outline-none focus:border-[#F47721]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Period Presentation Prefix
+                            </label>
+                            <input
+                              type="text"
+                              value={styleEdit.periodPresentationPrefix ?? 'For the Month of'}
+                              placeholder="For the Month of"
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({ ...styleEdit, periodPresentationPrefix: e.target.value });
+                              }}
+                              className="w-full px-2.5 py-1.5 text-[12.5px] border border-[#E5E7EB] rounded-[6px] focus:outline-none focus:border-[#F47721]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Font Size & Weight */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Heading Font Size ({styleEdit.titleBannerFontSizePt ?? 12.5} pt)
+                            </label>
+                            <input
+                              type="range"
+                              min={10}
+                              max={24}
+                              step={0.5}
+                              value={styleEdit.titleBannerFontSizePt ?? 12.5}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({ ...styleEdit, titleBannerFontSizePt: Number(e.target.value) });
+                              }}
+                              className="w-full accent-[#F47721]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Font Weight
+                            </label>
+                            <select
+                              value={styleEdit.titleBannerFontWeight || '700'}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({ ...styleEdit, titleBannerFontWeight: e.target.value });
+                              }}
+                              className="w-full px-2.5 py-1.5 text-[12.5px] border border-[#E5E7EB] rounded-[6px]"
+                            >
+                              <option value="400">Regular (400)</option>
+                              <option value="500">Medium (500)</option>
+                              <option value="600">Semi-Bold (600)</option>
+                              <option value="700">Bold (700)</option>
+                              <option value="800">Extra Bold (800)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Text Colour & Background Colour */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Heading Text Colour
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={styleEdit.titleBannerTitleColor || '#1F2937'}
+                                onChange={(e) => {
+                                  setDirty(true);
+                                  setStyleEdit({ ...styleEdit, titleBannerTitleColor: e.target.value.toUpperCase() });
+                                }}
+                                className="w-8 h-8 p-0.5 rounded-[5px] border border-[#E5E7EB] cursor-pointer shrink-0"
+                              />
+                              <input
+                                type="text"
+                                maxLength={7}
+                                value={styleEdit.titleBannerTitleColor || '#1F2937'}
+                                onChange={(e) => {
+                                  setDirty(true);
+                                  setStyleEdit({ ...styleEdit, titleBannerTitleColor: e.target.value });
+                                }}
+                                className="w-full px-2 py-1 text-[12px] font-mono uppercase border border-[#E5E7EB] rounded-[6px]"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Heading Background
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={styleEdit.titleBannerBgColor || '#FFF8F3'}
+                                onChange={(e) => {
+                                  setDirty(true);
+                                  setStyleEdit({ ...styleEdit, titleBannerBgColor: e.target.value.toUpperCase() });
+                                }}
+                                className="w-8 h-8 p-0.5 rounded-[5px] border border-[#E5E7EB] cursor-pointer shrink-0"
+                              />
+                              <input
+                                type="text"
+                                maxLength={7}
+                                value={styleEdit.titleBannerBgColor || '#FFF8F3'}
+                                onChange={(e) => {
+                                  setDirty(true);
+                                  setStyleEdit({ ...styleEdit, titleBannerBgColor: e.target.value });
+                                }}
+                                className="w-full px-2 py-1 text-[12px] font-mono uppercase border border-[#E5E7EB] rounded-[6px]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Top and Bottom Spacing */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Top Spacing ({styleEdit.titleBannerTopSpacingPx ?? 0} px)
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={24}
+                              value={styleEdit.titleBannerTopSpacingPx ?? 0}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({ ...styleEdit, titleBannerTopSpacingPx: Number(e.target.value) });
+                              }}
+                              className="w-full accent-[#F47721]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Bottom Spacing ({styleEdit.titleBannerBottomSpacingPx ?? 8} px)
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={24}
+                              value={styleEdit.titleBannerBottomSpacingPx ?? 8}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({ ...styleEdit, titleBannerBottomSpacingPx: Number(e.target.value) });
+                              }}
+                              className="w-full accent-[#F47721]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Divider / Border controls */}
+                        <div className="space-y-2 pt-2 border-t border-[#E5E7EB]">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={styleEdit.showTitleBannerDivider !== false}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({ ...styleEdit, showTitleBannerDivider: e.target.checked });
+                              }}
+                              className="rounded text-[#F47721] focus:ring-[#F47721]"
+                            />
+                            <span className="text-[12.5px] font-medium text-[#1F2937]">
+                              Show Heading Divider / Bottom Border
+                            </span>
+                          </label>
+
+                          {styleEdit.showTitleBannerDivider !== false && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6 pt-1">
+                              <div>
+                                <label className="block text-[11px] text-[#6B7280] mb-1">Border Colour</label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={styleEdit.titleBannerDividerColor || '#E5E7EB'}
+                                    onChange={(e) => {
+                                      setDirty(true);
+                                      setStyleEdit({ ...styleEdit, titleBannerDividerColor: e.target.value.toUpperCase() });
+                                    }}
+                                    className="w-7 h-7 p-0.5 rounded border border-[#E5E7EB] cursor-pointer"
+                                  />
+                                  <input
+                                    type="text"
+                                    maxLength={7}
+                                    value={styleEdit.titleBannerDividerColor || '#E5E7EB'}
+                                    onChange={(e) => {
+                                      setDirty(true);
+                                      setStyleEdit({ ...styleEdit, titleBannerDividerColor: e.target.value });
+                                    }}
+                                    className="w-full px-2 py-1 text-[11.5px] font-mono border border-[#E5E7EB] rounded"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[11px] text-[#6B7280] mb-1">
+                                  Border Thickness ({styleEdit.titleBannerDividerThicknessPt ?? 1} pt)
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0.5}
+                                  max={3}
+                                  step={0.5}
+                                  value={styleEdit.titleBannerDividerThicknessPt ?? 1}
+                                  onChange={(e) => {
+                                    setDirty(true);
+                                    setStyleEdit({ ...styleEdit, titleBannerDividerThicknessPt: Number(e.target.value) });
+                                  }}
+                                  className="w-full accent-[#F47721]"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Employee Details Section */}
+                  <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('employeeDetails')}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-[#FFFFFF] hover:bg-[#F8F9FA] transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Users className="w-4 h-4 text-[#F47721]" />
+                        <span className="text-[14.5px] font-semibold text-[#1F2937]">
+                          3. Employee Details Section
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-[#6B7280]">
+                          {collapsedSections.employeeDetails ? 'Expand' : 'Collapse'}
+                        </span>
+                        {collapsedSections.employeeDetails ? (
+                          <ChevronRight className="w-4 h-4 text-[#6B7280]" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-[#6B7280]" />
+                        )}
+                      </div>
+                    </button>
+
+                    {!collapsedSections.employeeDetails && (
+                      <div className="p-4 border-t border-[#E5E7EB] space-y-4">
+                        {/* Section Heading Toggle */}
+                        <div className="flex items-center justify-between p-3 rounded-[8px] bg-[#F8F9FA] border border-[#E5E7EB]">
+                          <div>
+                            <span className="text-[12.5px] font-semibold text-[#1F2937] block">
+                              Section Heading
+                            </span>
+                            <span className="text-[11px] text-[#6B7280]">
+                              Display section heading before employee information table
+                            </span>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={styleEdit.showEmployeeDetailsHeading !== false}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({
+                                  ...styleEdit,
+                                  showEmployeeDetailsHeading: e.target.checked,
+                                });
+                              }}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-[#E5E7EB] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#F47721]"></div>
+                          </label>
+                        </div>
+
+                        {styleEdit.showEmployeeDetailsHeading !== false && (
+                          <div className="space-y-3.5 p-3.5 rounded-[8px] border border-[#E5E7EB] bg-white">
+                            {/* Heading Text */}
+                            <div>
+                              <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                                Heading Text
+                              </label>
+                              <input
+                                type="text"
+                                value={styleEdit.employeeDetailsSectionHeading ?? 'EMPLOYEE DETAILS'}
+                                onChange={(e) => {
+                                  setDirty(true);
+                                  setStyleEdit({
+                                    ...styleEdit,
+                                    employeeDetailsSectionHeading: e.target.value,
+                                  });
+                                }}
+                                placeholder="EMPLOYEE DETAILS"
+                                className="w-full px-2.5 py-1.5 text-[12.5px] border border-[#E5E7EB] rounded-[6px] focus:outline-none focus:border-[#F47721]"
+                              />
+                            </div>
+
+                            {/* Heading Alignment */}
+                            <div className="space-y-1.5">
+                              <label className="block text-[11px] font-medium text-[#6B7280] uppercase tracking-wide">
+                                Heading Alignment
+                              </label>
+                              <div className="flex gap-1.5">
+                                {(['Left', 'Center', 'Right'] as const).map((align) => (
+                                  <button
+                                    key={align}
+                                    type="button"
+                                    onClick={() => {
+                                      setDirty(true);
+                                      setStyleEdit({
+                                        ...styleEdit,
+                                        employeeDetailsHeadingAlignment: align,
+                                      });
+                                    }}
+                                    className={`flex-1 py-1.5 rounded-[6px] text-[11.5px] font-medium border transition-colors cursor-pointer ${
+                                      (styleEdit.employeeDetailsHeadingAlignment || 'Left') === align
+                                        ? 'bg-[#F47721] border-[#F47721] text-white'
+                                        : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-[#F47721] hover:text-[#F47721]'
+                                    }`}
+                                  >
+                                    {align}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Font Size & Weight */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                              <div>
+                                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                                  Font Size ({styleEdit.employeeDetailsHeadingFontSizePt ?? 10.5} pt)
+                                </label>
+                                <input
+                                  type="range"
+                                  min={8}
+                                  max={18}
+                                  step={0.5}
+                                  value={styleEdit.employeeDetailsHeadingFontSizePt ?? 10.5}
+                                  onChange={(e) => {
+                                    setDirty(true);
+                                    setStyleEdit({
+                                      ...styleEdit,
+                                      employeeDetailsHeadingFontSizePt: Number(e.target.value),
+                                    });
+                                  }}
+                                  className="w-full accent-[#F47721]"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                                  Font Weight
+                                </label>
+                                <select
+                                  value={styleEdit.employeeDetailsHeadingFontWeight || '700'}
+                                  onChange={(e) => {
+                                    setDirty(true);
+                                    setStyleEdit({
+                                      ...styleEdit,
+                                      employeeDetailsHeadingFontWeight: e.target.value,
+                                    });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 text-[12px] border border-[#E5E7EB] rounded-[6px]"
+                                >
+                                  <option value="400">Regular (400)</option>
+                                  <option value="500">Medium (500)</option>
+                                  <option value="600">Semi-Bold (600)</option>
+                                  <option value="700">Bold (700)</option>
+                                  <option value="800">Extra Bold (800)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Font Colour & Background Colour */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                              <div>
+                                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                                  Font Colour
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={styleEdit.employeeDetailsHeadingTextColor || '#1F2937'}
+                                    onChange={(e) => {
+                                      setDirty(true);
+                                      setStyleEdit({
+                                        ...styleEdit,
+                                        employeeDetailsHeadingTextColor: e.target.value.toUpperCase(),
+                                      });
+                                    }}
+                                    className="w-8 h-8 p-0.5 rounded-[5px] border border-[#E5E7EB] cursor-pointer shrink-0"
+                                  />
+                                  <input
+                                    type="text"
+                                    maxLength={7}
+                                    value={styleEdit.employeeDetailsHeadingTextColor || '#1F2937'}
+                                    onChange={(e) => {
+                                      setDirty(true);
+                                      setStyleEdit({
+                                        ...styleEdit,
+                                        employeeDetailsHeadingTextColor: e.target.value,
+                                      });
+                                    }}
+                                    className="w-full px-2 py-1 text-[12px] font-mono uppercase border border-[#E5E7EB] rounded-[6px]"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                                  Background Colour
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={styleEdit.employeeDetailsHeadingBgColor && styleEdit.employeeDetailsHeadingBgColor !== 'transparent' ? styleEdit.employeeDetailsHeadingBgColor : '#FFFFFF'}
+                                    onChange={(e) => {
+                                      setDirty(true);
+                                      setStyleEdit({
+                                        ...styleEdit,
+                                        employeeDetailsHeadingBgColor: e.target.value.toUpperCase(),
+                                      });
+                                    }}
+                                    className="w-8 h-8 p-0.5 rounded-[5px] border border-[#E5E7EB] cursor-pointer shrink-0"
+                                  />
+                                  <input
+                                    type="text"
+                                    maxLength={7}
+                                    placeholder="Transparent"
+                                    value={styleEdit.employeeDetailsHeadingBgColor || ''}
+                                    onChange={(e) => {
+                                      setDirty(true);
+                                      setStyleEdit({
+                                        ...styleEdit,
+                                        employeeDetailsHeadingBgColor: e.target.value,
+                                      });
+                                    }}
+                                    className="w-full px-2 py-1 text-[12px] font-mono uppercase border border-[#E5E7EB] rounded-[6px]"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Spacing: Top and Bottom */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                              <div>
+                                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                                  Top Spacing ({styleEdit.employeeDetailsHeadingTopSpacingPx ?? 6} px)
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={24}
+                                  value={styleEdit.employeeDetailsHeadingTopSpacingPx ?? 6}
+                                  onChange={(e) => {
+                                    setDirty(true);
+                                    setStyleEdit({
+                                      ...styleEdit,
+                                      employeeDetailsHeadingTopSpacingPx: Number(e.target.value),
+                                    });
+                                  }}
+                                  className="w-full accent-[#F47721]"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                                  Bottom Spacing ({styleEdit.employeeDetailsHeadingBottomSpacingPx ?? 4} px)
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={24}
+                                  value={styleEdit.employeeDetailsHeadingBottomSpacingPx ?? 4}
+                                  onChange={(e) => {
+                                    setDirty(true);
+                                    setStyleEdit({
+                                      ...styleEdit,
+                                      employeeDetailsHeadingBottomSpacingPx: Number(e.target.value),
+                                    });
+                                  }}
+                                  className="w-full accent-[#F47721]"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Heading Border Visibility, Color & Thickness */}
+                            <div className="space-y-2 pt-2 border-t border-[#E5E7EB]">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(styleEdit.showEmployeeDetailsHeadingBorder)}
+                                  onChange={(e) => {
+                                    setDirty(true);
+                                    setStyleEdit({
+                                      ...styleEdit,
+                                      showEmployeeDetailsHeadingBorder: e.target.checked,
+                                    });
+                                  }}
+                                  className="rounded text-[#F47721] focus:ring-[#F47721]"
+                                />
+                                <span className="text-[12px] font-medium text-[#1F2937]">
+                                  Show Heading Divider / Border
+                                </span>
+                              </label>
+
+                              {styleEdit.showEmployeeDetailsHeadingBorder && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6">
+                                  <div>
+                                    <label className="block text-[11px] text-[#6B7280] mb-1">
+                                      Border Colour
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="color"
+                                        value={styleEdit.employeeDetailsHeadingBorderColor || '#E5E7EB'}
+                                        onChange={(e) => {
+                                          setDirty(true);
+                                          setStyleEdit({
+                                            ...styleEdit,
+                                            employeeDetailsHeadingBorderColor: e.target.value.toUpperCase(),
+                                          });
+                                        }}
+                                        className="w-7 h-7 p-0.5 rounded border border-[#E5E7EB] cursor-pointer"
+                                      />
+                                      <input
+                                        type="text"
+                                        maxLength={7}
+                                        value={styleEdit.employeeDetailsHeadingBorderColor || '#E5E7EB'}
+                                        onChange={(e) => {
+                                          setDirty(true);
+                                          setStyleEdit({
+                                            ...styleEdit,
+                                            employeeDetailsHeadingBorderColor: e.target.value,
+                                          });
+                                        }}
+                                        className="w-full px-2 py-1 text-[11.5px] font-mono border border-[#E5E7EB] rounded"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[11px] text-[#6B7280] mb-1">
+                                      Border Thickness ({styleEdit.employeeDetailsHeadingBorderThicknessPt ?? 1} pt)
+                                    </label>
+                                    <input
+                                      type="range"
+                                      min={0.5}
+                                      max={3}
+                                      step={0.5}
+                                      value={styleEdit.employeeDetailsHeadingBorderThicknessPt ?? 1}
+                                      onChange={(e) => {
+                                        setDirty(true);
+                                        setStyleEdit({
+                                          ...styleEdit,
+                                          employeeDetailsHeadingBorderThicknessPt: Number(e.target.value),
+                                        });
+                                      }}
+                                      className="w-full accent-[#F47721]"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Section Padding & Table Settings */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-[#E5E7EB]">
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Section Padding ({styleEdit.employeeDetailsSectionPaddingPx ?? 6} px)
+                            </label>
+                            <input
+                              type="range"
+                              min={2}
+                              max={20}
+                              value={styleEdit.employeeDetailsSectionPaddingPx ?? 6}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({
+                                  ...styleEdit,
+                                  employeeDetailsSectionPaddingPx: Number(e.target.value),
+                                });
+                              }}
+                              className="w-full accent-[#F47721]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                              Employee Details Grid
+                            </label>
+                            <select
+                              value={styleEdit.employeeDetailsColumns}
+                              onChange={(e) => {
+                                setDirty(true);
+                                setStyleEdit({
+                                  ...styleEdit,
+                                  employeeDetailsColumns: Number(e.target.value),
+                                });
+                              }}
+                              className="w-full px-2.5 py-1.5 text-[12.5px] border border-[#E5E7EB] rounded-[6px]"
+                            >
+                              <option value={2}>2 Columns (Standard Corporate)</option>
+                              <option value={3}>3 Columns (High Density)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Employee Fields Display Toggles */}
+                        <div className="pt-2 border-t border-[#E5E7EB]">
+                          <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider mb-2">
+                            Employee Info Fields Display Toggles
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {[
+                              { label: 'Employee ID', key: 'showEmployeeId' as const },
+                              { label: 'Employee Name', key: 'showEmployeeName' as const },
+                              { label: 'Email Address', key: 'showEmployeeEmail' as const },
+                              { label: 'Department', key: 'showDepartment' as const },
+                              { label: 'Designation', key: 'showDesignation' as const },
+                              { label: 'Payroll Period', key: 'showPayrollPeriodInDetails' as const },
+                            ].map((item) => (
+                              <label key={item.key} className="flex items-center gap-2 text-[12px] text-[#1F2937] cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(styleEdit[item.key])}
+                                  onChange={(e) => {
+                                    setDirty(true);
+                                    setStyleEdit({ ...styleEdit, [item.key]: e.target.checked });
+                                  }}
+                                  className="rounded-[4px] text-[#F47721] focus:ring-[#F47721]"
+                                />
+                                <span>{item.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Page & Layout */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -4490,45 +5319,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                           </div>
                         </div>
 
-                        {/* Headings */}
+                        {/* Salary Tables Headings */}
                         <div className="pt-3 border-t border-[#E5E7EB] space-y-3.5">
-                          {/* Payslip Title Alignment */}
-                          <div className="space-y-1.5">
-                            <label className="block text-[11px] font-medium text-[#6B7280] uppercase tracking-wide">
-                              Payslip Title Alignment
-                            </label>
-                            <div className="flex gap-1.5">
-                              {(['Left', 'Center', 'Right'] as const).map((align) => (
-                                <button
-                                  key={align}
-                                  type="button"
-                                  onClick={() => setStyleEdit({ ...styleEdit, payslipTitleAlignment: align })}
-                                  className={`flex-1 py-1.5 rounded-[6px] text-[11.5px] font-medium border transition-colors cursor-pointer ${
-                                    (styleEdit.payslipTitleAlignment || 'Center') === align
-                                      ? 'bg-[#F47721] border-[#F47721] text-white'
-                                      : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-[#F47721] hover:text-[#F47721]'
-                                  }`}
-                                >
-                                  {align}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Employee Details Section Heading */}
-                          <div className="space-y-1.5">
-                            <label className="block text-[11px] font-medium text-[#6B7280] uppercase tracking-wide">
-                              Employee Details Heading
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="EMPLOYEE INFORMATION"
-                              className="w-full px-2.5 py-1.5 text-[12px] border border-[#E5E7EB] rounded-[6px] focus:outline-none focus:border-[#F47721]"
-                              value={styleEdit.employeeDetailsSectionHeading || ''}
-                              onChange={(e) => setStyleEdit({ ...styleEdit, employeeDetailsSectionHeading: e.target.value })}
-                            />
-                          </div>
-
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                           <div>
                             <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
@@ -5131,9 +5923,35 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
-                    Email Template
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11.5px] font-medium text-[#6B7280]">
+                      Email Template
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleResetEmailToDefault}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B7280] hover:text-[#F47721] transition-colors cursor-pointer"
+                        title="Reset subject and message body to dynamic default"
+                      >
+                        <RotateCcw className="w-3 h-3 text-[#F47721]" />
+                        <span>Reset to Default</span>
+                      </button>
+                      <span className="text-[#D1D5DB]">|</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewEmailTemplateName('');
+                          setShowSaveEmailTemplateModal(true);
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B7280] hover:text-[#F47721] transition-colors cursor-pointer"
+                        title="Save current email as a template preset"
+                      >
+                        <Save className="w-3 h-3 text-[#F47721]" />
+                        <span>Save as Template</span>
+                      </button>
+                    </div>
+                  </div>
                   <select
                     value={selectedEmailTemplateId}
                     onChange={(e) => {
@@ -5143,13 +5961,14 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       if (tpl) {
                         setEmailSubject(tpl.subjectTemplate);
                         setEmailBody(tpl.bodyTemplate);
+                        setEmailManuallyEdited(true);
                       }
                     }}
                     className="w-full px-3 py-1.5 text-[13px] border border-[#E5E7EB] rounded-[7px]"
                   >
                     {emailTemplates.map((et) => (
                       <option key={et.id} value={et.id}>
-                        {et.name}
+                        {et.name} {et.isDefault ? '(Default)' : ''}
                       </option>
                     ))}
                   </select>
@@ -5163,7 +5982,10 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                 <input
                   type="text"
                   value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
+                  onChange={(e) => {
+                    setEmailSubject(e.target.value);
+                    setEmailManuallyEdited(true);
+                  }}
                   className="w-full px-3 py-1.5 text-[13px] border border-[#E5E7EB] rounded-[7px]"
                 />
               </div>
@@ -5175,25 +5997,53 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                 <textarea
                   rows={4}
                   value={emailBody}
-                  onChange={(e) => setEmailBody(e.target.value)}
+                  onChange={(e) => {
+                    setEmailBody(e.target.value);
+                    setEmailManuallyEdited(true);
+                  }}
                   className="w-full p-3 text-[13px] border border-[#E5E7EB] rounded-[7px]"
                 />
               </div>
 
               {emailPreviewData && (
-                <div className="p-3 rounded-[8px] bg-[#FFF8F3] border border-[#E5E7EB] text-[12px] space-y-1">
-                  <div className="font-semibold text-[#1F2937]">
-                    Resolved Preview & Attachment
-                  </div>
-                  <div className="text-[#6B7280]">
-                    <span className="font-medium text-[#1F2937]">Subject:</span>{' '}
-                    {emailPreviewData.resolvedSubject}
-                  </div>
-                  <div className="text-[#6B7280]">
-                    <span className="font-medium text-[#1F2937]">PDF Attachment:</span>{' '}
-                    <span className="text-[#F47721] font-semibold">{emailPreviewData.attachmentName}</span>
+                <div className="p-3.5 rounded-[8px] bg-[#FFF8F3] border border-[#F47721]/30 text-[12px] space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-[#F47721]/20 pb-1.5">
+                    <span className="font-semibold text-[#1F2937] flex items-center gap-1.5">
+                      <Eye className="w-3.5 h-3.5 text-[#F47721]" />
+                      Resolved Preview &amp; Attachment
+                    </span>
+                    <span className="text-[10.5px] font-medium text-[#F47721] bg-white px-2 py-0.5 rounded border border-[#F47721]/20">
+                      Live Preview
+                    </span>
                   </div>
 
+                  <div>
+                    <span className="font-semibold text-[#6B7280] block text-[11px] uppercase tracking-wide mb-0.5">
+                      Subject:
+                    </span>
+                    <div className="p-2 bg-white rounded-[6px] border border-[#E5E7EB] font-medium text-[#1F2937] text-[12px]">
+                      {emailPreviewData.resolvedSubject}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="font-semibold text-[#6B7280] block text-[11px] uppercase tracking-wide mb-0.5">
+                      Email Preview:
+                    </span>
+                    <div className="p-2.5 bg-white rounded-[6px] border border-[#E5E7EB] text-[#1F2937] text-[12px] whitespace-pre-wrap leading-relaxed">
+                      {emailPreviewData.resolvedBody}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-[#F47721]/15 text-[#6B7280]">
+                    <span className="font-semibold text-[#1F2937] text-[11px] uppercase tracking-wide">
+                      PDF Attachment:
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded border border-[#E5E7EB] text-[#F47721] font-semibold text-[11.5px]">
+                      <FileText className="w-3.5 h-3.5 text-[#F47721]" />
+                      {emailPreviewData.attachmentName}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -5224,6 +6074,75 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   {saving ? 'Sending...' : 'Send Payslip'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* SAVE CUSTOM EMAIL TEMPLATE MODAL */}
+      {showSaveEmailTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#FFF4E8] flex items-center justify-center text-[#F47721]">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-[16px] font-bold text-[#1F2937]">Save Email Template</h3>
+                  <p className="text-[12px] text-[#6B7280]">Save subject and message body as an email template preset</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSaveEmailTemplateModal(false)}
+                className="text-[#9CA3AF] hover:text-[#1F2937] p-1 rounded-md transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                  Template Name
+                </label>
+                <input
+                  type="text"
+                  value={newEmailTemplateName}
+                  onChange={(e) => setNewEmailTemplateName(e.target.value)}
+                  placeholder="e.g. Accounts Department Monthly Statement"
+                  className="w-full px-3 py-2 text-[13px] border border-[#D1D5DB] rounded-[7px] focus:outline-none focus:border-[#F47721] focus:ring-1 focus:ring-[#F47721]"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveCustomEmailTemplate();
+                    }
+                  }}
+                />
+              </div>
+              <p className="text-[11px] text-[#6B7280]">
+                Placeholders such as &#123;&#123;EmployeeName&#125;&#125;, &#123;&#123;EmployeeID&#125;&#125;, &#123;&#123;PayrollMonth&#125;&#125;, &#123;&#123;PayrollYear&#125;&#125;, and &#123;&#123;CompanyName&#125;&#125; are resolved dynamically when generating payslip emails.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
+              <button
+                type="button"
+                onClick={() => setShowSaveEmailTemplateModal(false)}
+                className="px-3.5 py-2 text-[12.5px] font-medium text-[#4B5563] hover:text-[#1F2937] border border-[#E5E7EB] rounded-[7px] bg-[#FFFFFF] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!newEmailTemplateName.trim() || saving}
+                onClick={handleSaveCustomEmailTemplate}
+                className="px-4 py-2 text-[12.5px] font-semibold text-white bg-[#F47721] hover:bg-[#e06714] rounded-[7px] shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Save Template</span>
+              </button>
             </div>
           </div>
         </div>

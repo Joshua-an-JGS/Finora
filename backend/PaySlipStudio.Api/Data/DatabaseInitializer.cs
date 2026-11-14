@@ -57,7 +57,41 @@ public static class DatabaseInitializer
             }
         }
 
-        // 2. Ensure Existing Installations with an Administrator are Marked Initialized
+        // 2. Seed Initial Users Only if Explicitly Requested via Config (e.g. Automated Integration Tests)
+        if (string.Equals(config["BootstrapAdmin:ForceSeed"], "true", StringComparison.OrdinalIgnoreCase))
+        {
+            await EnsureUserAsync(
+                userManager,
+                email: "operator@amtdc.org",
+                userName: "operator@amtdc.org",
+                password: "Operator@12345!",
+                fullName: "Accounts Operator",
+                department: "Finance & Accounts",
+                role: AppRoles.AccountsOperator,
+                mfaRequired: false);
+
+            await EnsureUserAsync(
+                userManager,
+                email: "admin@amtdc.org",
+                userName: "admin@amtdc.org",
+                password: "Admin@12345!",
+                fullName: "System Administrator",
+                department: "IT & Governance",
+                role: AppRoles.Administrator,
+                mfaRequired: false);
+
+            await EnsureUserAsync(
+                userManager,
+                email: "viewer@amtdc.org",
+                userName: "viewer@amtdc.org",
+                password: "Viewer@12345!",
+                fullName: "Payroll Viewer",
+                department: "General Administration",
+                role: AppRoles.Viewer,
+                mfaRequired: false);
+        }
+
+        // 2b. Ensure Existing Installations with an Administrator are Marked Initialized
         var existingAdmins = await userManager.GetUsersInRoleAsync(AppRoles.Administrator);
         if (existingAdmins.Count > 0)
         {
@@ -116,6 +150,10 @@ public static class DatabaseInitializer
                 PrimaryTextColor = "#111827",
                 SecondaryTextColor = "#6B7280",
                 TableLayoutMode = "SideBySide",
+                PayslipTitleAlignment = "Left",
+                ShowEmployeeDetailsHeading = true,
+                EmployeeDetailsSectionHeading = "EMPLOYEE DETAILS",
+                EmployeeDetailsHeadingAlignment = "Left",
                 ShowZeroValueRows = false,
                 ShowAmountInWords = true,
                 HighlightNetSalaryBox = true,
@@ -235,6 +273,61 @@ Accounts & Finance Department
                 }
             );
             await db.SaveChangesAsync();
+        }
+
+        // 6. Auto-Import Mock Excel File on Boot if Database Has No Payroll Records (Only in ForceSeed mode)
+        if (!await db.PayrollRecords.AnyAsync() && string.Equals(config["BootstrapAdmin:ForceSeed"], "true", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseDataDir = config["FINORA_BASE_DATA_DIR"]
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FINORA");
+
+            var candidatePaths = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
+                Path.Combine(AppContext.BaseDirectory, "Resources", "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
+                Path.Combine(baseDataDir, "Imports", "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
+                Path.Combine(env.ContentRootPath, "..", "..", "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
+                Path.Combine(env.ContentRootPath, "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"),
+                @"G:\UAV\PAY SLIP\PaySlip_Studio_Mock_Payroll_Test_Data.xlsx"
+            };
+
+            var mockFilePath = candidatePaths.FirstOrDefault(File.Exists);
+            if (mockFilePath != null)
+            {
+                var adminUser = await userManager.FindByNameAsync("admin@amtdc.org") ?? await userManager.FindByNameAsync("admin");
+                string uid = adminUser?.Id ?? "system";
+                string uname = adminUser?.UserName ?? "admin";
+
+                var sheetsToSeed = new (string SheetName, int Month, int Year)[]
+                {
+                    ("September 2026", 9, 2026),
+                    ("October 2026", 10, 2026),
+                    ("November 2026", 11, 2026)
+                };
+
+                foreach (var (sheetName, month, year) in sheetsToSeed)
+                {
+                    await using var fs = new FileStream(mockFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    var stage = await excelService.StageUploadAsync(
+                        fs,
+                        "PaySlip_Studio_Mock_Payroll_Test_Data.xlsx",
+                        month,
+                        year,
+                        uid,
+                        uname);
+
+                    await excelService.AnalyzeAndPreviewAsync(stage.ImportBatchId, sheetName, month, year);
+                    await excelService.CommitImportBatchAsync(stage.ImportBatchId, true, uid, uname, AppRoles.Administrator);
+                }
+
+                var settings = await db.CompanySettings.FirstOrDefaultAsync();
+                if (settings != null)
+                {
+                    settings.ActivePayrollMonth = 10;
+                    settings.ActivePayrollYear = 2026;
+                    await db.SaveChangesAsync();
+                }
+            }
         }
     }
 

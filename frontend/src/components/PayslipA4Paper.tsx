@@ -366,32 +366,97 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
     const bannerBg = cfg.titleBannerBgColor || subtleOrange;
     const titleColor = cfg.titleBannerTitleColor || textMain;
     const periodColor = cfg.titleBannerPeriodColor || orange;
-    const titleAlign = cfg.payslipTitleAlignment || 'Center';
-    const flexJustify =
-      titleAlign === 'Left' ? 'flex-start' :
-      titleAlign === 'Right' ? 'flex-end' :
-      'center';
+    const titleAlign = cfg.payslipTitleAlignment || 'Left';
+    const titleFontSize = cfg.titleBannerFontSizePt || (baseFontPt + 2.5);
+    const titleFontWeight = cfg.titleBannerFontWeight || '700';
+    const topSpacing = cfg.titleBannerTopSpacingPx ?? 0;
+    const bottomSpacing = cfg.titleBannerBottomSpacingPx ?? (sectionGapPx > 0 ? sectionGapPx : 8);
+    const showDivider = cfg.showTitleBannerDivider !== false;
+    const dividerColor = cfg.titleBannerDividerColor || borderGray;
+    const dividerThickness = cfg.titleBannerDividerThicknessPt || 1;
+
+    const docTitle = (cfg.documentTitle || 'PAYSLIP').trim();
+    const prefix = cfg.periodPresentationPrefix ? cfg.periodPresentationPrefix.trim() : 'For the Month of';
+    const periodText = prefix ? `${prefix} ${doc.periodLabel}` : doc.periodLabel;
+    const combinedHeading = (prefix
+      ? `${docTitle} ${prefix} ${doc.periodLabel}`
+      : `${docTitle} ${doc.periodLabel}`
+    ).toUpperCase();
+
+    if (titleAlign === 'Center') {
+      return (
+        <div
+          key="TitleBanner"
+          className="py-2 px-3 rounded-[6px] text-center"
+          style={{
+            backgroundColor: bannerBg,
+            borderBottom: showDivider ? `${dividerThickness}px solid ${dividerColor}` : 'none',
+            marginTop: `${topSpacing}px`,
+            marginBottom: `${bottomSpacing}px`,
+          }}
+        >
+          <div
+            style={{
+              color: titleColor,
+              fontSize: `${titleFontSize}pt`,
+              fontWeight: titleFontWeight,
+              letterSpacing: '0.06em',
+            }}
+          >
+            {combinedHeading}
+          </div>
+        </div>
+      );
+    }
+
+    if (titleAlign === 'Right') {
+      return (
+        <div
+          key="TitleBanner"
+          className="py-2 px-3 rounded-[6px] text-right"
+          style={{
+            backgroundColor: bannerBg,
+            borderBottom: showDivider ? `${dividerThickness}px solid ${dividerColor}` : 'none',
+            marginTop: `${topSpacing}px`,
+            marginBottom: `${bottomSpacing}px`,
+          }}
+        >
+          <div
+            style={{
+              color: titleColor,
+              fontSize: `${titleFontSize}pt`,
+              fontWeight: titleFontWeight,
+              letterSpacing: '0.06em',
+            }}
+          >
+            {combinedHeading}
+          </div>
+        </div>
+      );
+    }
+
+    // Default Left: Split layout (PAYSLIP on the left and payroll month/year on the right)
     return (
       <div
         key="TitleBanner"
-        className="flex items-baseline py-2 px-3 rounded-[6px]"
+        className="flex items-baseline justify-between py-2 px-3 rounded-[6px]"
         style={{
           backgroundColor: bannerBg,
-          borderBottom: `1px solid ${borderGray}`,
-          marginBottom: `${sectionGapPx}px`,
-          justifyContent: flexJustify,
+          borderBottom: showDivider ? `${dividerThickness}px solid ${dividerColor}` : 'none',
+          marginTop: `${topSpacing}px`,
+          marginBottom: `${bottomSpacing}px`,
           gap: '1rem',
         }}
       >
         <div
           style={{
             color: titleColor,
-            fontSize: `${baseFontPt + 2.5}pt`,
-            fontWeight: 700,
+            fontSize: `${titleFontSize}pt`,
+            fontWeight: titleFontWeight,
             letterSpacing: '0.06em',
           }}
         >
-          {cfg.documentTitle || 'PAYSLIP'}
+          {docTitle}
         </div>
         <div
           style={{
@@ -400,59 +465,107 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
             fontWeight: 600,
           }}
         >
-          {cfg.periodPresentationPrefix
-            ? `${cfg.periodPresentationPrefix} ${doc.periodLabel}`
-            : doc.periodLabel}
+          {periodText}
         </div>
       </div>
     );
   };
-  // Section 17: Clean Two-Column Employee Information (no heavy card boxes)
+  // Section 17: Clean Two-Column Employee Information with Section Heading
   const renderEmployeeDetails = () => {
     if (employeeInfoItems.length === 0) return null;
     const cols = cfg.employeeDetailsColumns === 3 ? 3 : 2;
     const showBorder = cfg.enableBorders !== false && cfg.showEmployeeDetailsBorder !== false;
     const bThickness = cfg.borderThicknessPt || 1;
     const bColor = cfg.borderColor || borderGray;
+
+    const showHeading = cfg.showEmployeeDetailsHeading !== false;
+    const headingText = (cfg.employeeDetailsSectionHeading || 'EMPLOYEE DETAILS').trim();
+    const headingAlign = cfg.employeeDetailsHeadingAlignment || 'Left';
+    const headingFontSize = cfg.employeeDetailsHeadingFontSizePt || (baseFontPt + 0.5);
+    const headingFontWeight = cfg.employeeDetailsHeadingFontWeight || '700';
+    const headingColor = cfg.employeeDetailsHeadingTextColor || textMain;
+    const headingBg = cfg.employeeDetailsHeadingBgColor && cfg.employeeDetailsHeadingBgColor !== 'transparent' ? cfg.employeeDetailsHeadingBgColor : undefined;
+    const headingTopSpacing = cfg.employeeDetailsHeadingTopSpacingPx ?? 6;
+    const headingBottomSpacing = cfg.employeeDetailsHeadingBottomSpacingPx ?? 4;
+    const showHeadingBorder = Boolean(cfg.showEmployeeDetailsHeadingBorder);
+    const headingBorderColor = cfg.employeeDetailsHeadingBorderColor || borderGray;
+    const headingBorderThickness = cfg.employeeDetailsHeadingBorderThicknessPt || 1;
+    const sectionPadding = cfg.employeeDetailsSectionPaddingPx ?? 6;
+
+    const headingJustify =
+      headingAlign === 'Left' ? 'justify-start text-left' :
+      headingAlign === 'Right' ? 'justify-end text-right' :
+      'justify-center text-center';
+
     return (
       <div
         key="EmployeeDetails"
-        className="py-3"
         style={{
-          borderTop: showBorder ? `${bThickness}px solid ${bColor}` : 'none',
-          borderBottom: showBorder ? `${bThickness}px solid ${bColor}` : 'none',
           marginBottom: `${sectionGapPx}px`,
         }}
       >
+        {showHeading && (
+          <div
+            className={`flex items-center ${headingJustify}`}
+            style={{
+              paddingTop: `${headingTopSpacing}px`,
+              paddingBottom: `${headingBottomSpacing}px`,
+              backgroundColor: headingBg,
+              borderBottom: showHeadingBorder ? `${headingBorderThickness}px solid ${headingBorderColor}` : 'none',
+              paddingLeft: headingBg ? '8px' : 0,
+              paddingRight: headingBg ? '8px' : 0,
+            }}
+          >
+            <div
+              style={{
+                color: headingColor,
+                fontSize: `${headingFontSize}pt`,
+                fontWeight: headingFontWeight,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {headingText}
+            </div>
+          </div>
+        )}
         <div
-          className="grid gap-y-2 gap-x-8"
           style={{
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+            borderTop: showBorder ? `${bThickness}px solid ${bColor}` : 'none',
+            borderBottom: showBorder ? `${bThickness}px solid ${bColor}` : 'none',
+            paddingTop: `${sectionPadding}px`,
+            paddingBottom: `${sectionPadding}px`,
           }}
         >
-          {employeeInfoItems.map((item, idx) => (
-            <div key={idx} className="flex items-baseline justify-between gap-3 py-0.5">
-              <span
-                style={{
-                  color: textSecondary,
-                  fontSize: `${baseFontPt - 0.5}pt`,
-                  fontWeight: 500,
-                }}
-              >
-                {item.label}
-              </span>
-              <span
-                className="text-right"
-                style={{
-                  color: textMain,
-                  fontSize: `${baseFontPt}pt`,
-                  fontWeight: 600,
-                }}
-              >
-                {item.value}
-              </span>
-            </div>
-          ))}
+          <div
+            className="grid gap-y-2 gap-x-8"
+            style={{
+              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+            }}
+          >
+            {employeeInfoItems.map((item, idx) => (
+              <div key={idx} className="flex items-baseline justify-between gap-3 py-0.5">
+                <span
+                  style={{
+                    color: textSecondary,
+                    fontSize: `${baseFontPt - 0.5}pt`,
+                    fontWeight: 500,
+                  }}
+                >
+                  {item.label}
+                </span>
+                <span
+                  className="text-right"
+                  style={{
+                    color: textMain,
+                    fontSize: `${baseFontPt}pt`,
+                    fontWeight: 600,
+                  }}
+                >
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

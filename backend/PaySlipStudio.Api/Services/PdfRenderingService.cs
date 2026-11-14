@@ -526,23 +526,78 @@ public class PdfRenderingService
         string subtleOrangeHex,
         float baseFontPt)
     {
+        string align = !string.IsNullOrWhiteSpace(cfg.PayslipTitleAlignment) ? cfg.PayslipTitleAlignment.Trim() : "Left";
+        string docTitle = !string.IsNullOrWhiteSpace(cfg.DocumentTitle) ? cfg.DocumentTitle.Trim() : "PAYSLIP";
         string prefix = !string.IsNullOrWhiteSpace(cfg.PeriodPresentationPrefix)
             ? cfg.PeriodPresentationPrefix.Trim()
             : "For the Month of";
         string rightText = !string.IsNullOrWhiteSpace(prefix)
             ? $"{prefix} {model.PeriodLabel}"
             : model.PeriodLabel;
-        string bannerBg = !string.IsNullOrWhiteSpace(cfg.TitleBannerBgColor) ? cfg.TitleBannerBgColor : orangeHex;
-        string titleColor = !string.IsNullOrWhiteSpace(cfg.TitleBannerTitleColor) ? cfg.TitleBannerTitleColor : "#FFFFFF";
-        string periodColor = !string.IsNullOrWhiteSpace(cfg.TitleBannerPeriodColor) ? cfg.TitleBannerPeriodColor : "#FFFFFF";
-        container
+
+        string bannerBg = !string.IsNullOrWhiteSpace(cfg.TitleBannerBgColor) ? cfg.TitleBannerBgColor : subtleOrangeHex;
+        string titleColor = !string.IsNullOrWhiteSpace(cfg.TitleBannerTitleColor) ? cfg.TitleBannerTitleColor : navyHex;
+        string periodColor = !string.IsNullOrWhiteSpace(cfg.TitleBannerPeriodColor) ? cfg.TitleBannerPeriodColor : orangeHex;
+
+        float titleFontSize = cfg.TitleBannerFontSizePt.HasValue && cfg.TitleBannerFontSizePt.Value > 0
+            ? cfg.TitleBannerFontSizePt.Value
+            : baseFontPt + 2.5f;
+
+        float topSpacing = cfg.TitleBannerTopSpacingPx * 0.75f;
+        float bottomSpacing = (cfg.TitleBannerBottomSpacingPx > 0 ? cfg.TitleBannerBottomSpacingPx : 8) * 0.75f;
+
+        bool showDivider = cfg.ShowTitleBannerDivider;
+        float dividerThickness = cfg.TitleBannerDividerThicknessPt > 0 ? cfg.TitleBannerDividerThicknessPt : 1.0f;
+        string dividerColor = SafeHex(cfg.TitleBannerDividerColor, cfg.BorderColor ?? "#E5E7EB");
+
+        var box = container;
+        if (topSpacing > 0)
+        {
+            box = box.PaddingTop(topSpacing);
+        }
+        if (bottomSpacing > 0)
+        {
+            box = box.PaddingBottom(bottomSpacing);
+        }
+
+        var contentBox = box
             .Background(bannerBg)
             .PaddingVertical(6)
-            .PaddingHorizontal(10)
-            .Row(row =>
+            .PaddingHorizontal(10);
+
+        if (showDivider)
+        {
+            contentBox = contentBox.BorderBottom(dividerThickness).BorderColor(dividerColor);
+        }
+
+        if (string.Equals(align, "Center", StringComparison.OrdinalIgnoreCase))
+        {
+            string combinedText = !string.IsNullOrWhiteSpace(prefix)
+                ? $"{docTitle} {prefix} {model.PeriodLabel}".ToUpperInvariant()
+                : $"{docTitle} {model.PeriodLabel}".ToUpperInvariant();
+
+            contentBox.AlignCenter().AlignMiddle().Text(combinedText)
+                .FontSize(titleFontSize)
+                .Bold()
+                .FontColor(titleColor);
+        }
+        else if (string.Equals(align, "Right", StringComparison.OrdinalIgnoreCase))
+        {
+            string combinedText = !string.IsNullOrWhiteSpace(prefix)
+                ? $"{docTitle} {prefix} {model.PeriodLabel}".ToUpperInvariant()
+                : $"{docTitle} {model.PeriodLabel}".ToUpperInvariant();
+
+            contentBox.AlignRight().AlignMiddle().Text(combinedText)
+                .FontSize(titleFontSize)
+                .Bold()
+                .FontColor(titleColor);
+        }
+        else
+        {
+            contentBox.Row(row =>
             {
-                row.RelativeItem().AlignMiddle().Text(cfg.DocumentTitle ?? "PAYSLIP")
-                    .FontSize(baseFontPt + 2.5f)
+                row.RelativeItem().AlignMiddle().Text(docTitle)
+                    .FontSize(titleFontSize)
                     .Bold()
                     .FontColor(titleColor);
                 row.RelativeItem().AlignRight().AlignMiddle().Text(rightText)
@@ -550,6 +605,7 @@ public class PdfRenderingService
                     .SemiBold()
                     .FontColor(periodColor);
             });
+        }
     }
     private static void ComposeEmployeeDetails(
         IContainer container,
@@ -590,42 +646,99 @@ public class PdfRenderingService
         bool showEmpBorder = cfg.EnableBorders && cfg.ShowEmployeeDetailsBorder;
         float borderThickness = cfg.BorderThicknessPt > 0 ? cfg.BorderThicknessPt : 1.0f;
         string effBorderColor = SafeHex(cfg.BorderColor, borderHex);
-        var section = container;
-        if (showEmpBorder)
+        float sectionPadPt = cfg.EmployeeDetailsSectionPaddingPx > 0
+            ? cfg.EmployeeDetailsSectionPaddingPx * 0.75f
+            : 4.5f;
+
+        container.Column(col =>
         {
-            section = section.BorderTop(borderThickness).BorderBottom(borderThickness).BorderColor(effBorderColor);
-        }
-        section
-            .PaddingVertical(6)
-            .Table(table =>
+            // Optional Employee Details Section Heading
+            if (cfg.ShowEmployeeDetailsHeading)
             {
-                table.ColumnsDefinition(c =>
+                string headingText = !string.IsNullOrWhiteSpace(cfg.EmployeeDetailsSectionHeading)
+                    ? cfg.EmployeeDetailsSectionHeading.Trim()
+                    : "EMPLOYEE DETAILS";
+                string headingAlign = cfg.EmployeeDetailsHeadingAlignment ?? "Left";
+                float headingFontSize = cfg.EmployeeDetailsHeadingFontSizePt > 0
+                    ? cfg.EmployeeDetailsHeadingFontSizePt
+                    : baseFontPt + 0.5f;
+                string headingColor = SafeHex(cfg.EmployeeDetailsHeadingTextColor, textPrimaryHex);
+                float headingTopSpacing = cfg.EmployeeDetailsHeadingTopSpacingPx * 0.75f;
+                float headingBottomSpacing = cfg.EmployeeDetailsHeadingBottomSpacingPx * 0.75f;
+
+                var headingItem = col.Item();
+                if (headingTopSpacing > 0)
                 {
-                    for (int i = 0; i < cols; i++)
-                        c.RelativeColumn();
-                });
-                foreach (var item in items)
+                    headingItem = headingItem.PaddingTop(headingTopSpacing);
+                }
+
+                var headingBox = headingItem;
+                if (!string.IsNullOrWhiteSpace(cfg.EmployeeDetailsHeadingBgColor) &&
+                    !string.Equals(cfg.EmployeeDetailsHeadingBgColor, "transparent", StringComparison.OrdinalIgnoreCase))
                 {
-                    table.Cell().PaddingVertical(2).PaddingRight(12).Row(r =>
+                    headingBox = headingBox.Background(cfg.EmployeeDetailsHeadingBgColor).PaddingHorizontal(6).PaddingVertical(3);
+                }
+
+                if (cfg.ShowEmployeeDetailsHeadingBorder)
+                {
+                    float hBorderThick = cfg.EmployeeDetailsHeadingBorderThicknessPt > 0 ? cfg.EmployeeDetailsHeadingBorderThicknessPt : 1.0f;
+                    string hBorderColor = SafeHex(cfg.EmployeeDetailsHeadingBorderColor, effBorderColor);
+                    headingBox = headingBox.BorderBottom(hBorderThick).BorderColor(hBorderColor);
+                }
+
+                var textEl = headingBox.PaddingBottom(headingBottomSpacing);
+                if (string.Equals(headingAlign, "Center", StringComparison.OrdinalIgnoreCase))
+                {
+                    textEl.AlignCenter().Text(headingText).FontSize(headingFontSize).Bold().FontColor(headingColor);
+                }
+                else if (string.Equals(headingAlign, "Right", StringComparison.OrdinalIgnoreCase))
+                {
+                    textEl.AlignRight().Text(headingText).FontSize(headingFontSize).Bold().FontColor(headingColor);
+                }
+                else
+                {
+                    textEl.AlignLeft().Text(headingText).FontSize(headingFontSize).Bold().FontColor(headingColor);
+                }
+            }
+
+            var tableContainer = col.Item();
+            if (showEmpBorder)
+            {
+                tableContainer = tableContainer.BorderTop(borderThickness).BorderBottom(borderThickness).BorderColor(effBorderColor);
+            }
+
+            tableContainer
+                .PaddingVertical(sectionPadPt)
+                .Table(table =>
+                {
+                    table.ColumnsDefinition(c =>
                     {
-                        r.AutoItem().Text(item.Label)
-                            .FontSize(baseFontPt - 0.5f)
-                            .FontColor(textSecondaryHex);
-                        r.RelativeItem().AlignRight().Text(item.Value)
-                            .FontSize(baseFontPt)
-                            .SemiBold()
-                            .FontColor(textPrimaryHex);
+                        for (int i = 0; i < cols; i++)
+                            c.RelativeColumn();
                     });
-                }
-                int remainder = items.Count % cols;
-                if (remainder != 0)
-                {
-                    for (int pad = 0; pad < cols - remainder; pad++)
+                    foreach (var item in items)
                     {
-                        table.Cell();
+                        table.Cell().PaddingVertical(2).PaddingRight(12).Row(r =>
+                        {
+                            r.AutoItem().Text(item.Label)
+                                .FontSize(baseFontPt - 0.5f)
+                                .FontColor(textSecondaryHex);
+                            r.RelativeItem().AlignRight().Text(item.Value)
+                                .FontSize(baseFontPt)
+                                .SemiBold()
+                                .FontColor(textPrimaryHex);
+                        });
                     }
-                }
-            });
+                    int remainder = items.Count % cols;
+                    if (remainder != 0)
+                    {
+                        for (int pad = 0; pad < cols - remainder; pad++)
+                        {
+                            table.Cell();
+                        }
+                    }
+                });
+        });
     }
     private static void ComposeSalaryTables(
         IContainer container,

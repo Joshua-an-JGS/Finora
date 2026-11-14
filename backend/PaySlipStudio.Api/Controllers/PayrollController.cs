@@ -753,13 +753,6 @@ public class PayrollController : ControllerBase
             snapshotDict["Total Deductions"] = effectiveDeductionsTotal;
             snapshotDict["Net Salary"] = calculatedNetTotal;
             record.SourceRowSnapshotJson = JsonSerializer.Serialize(snapshotDict);
-
-            if (anyEarningEdited || anyDeductionEdited)
-            {
-                record.ImportedGrossSalary = effectiveGrossTotal;
-                record.ImportedTotalDeductions = effectiveDeductionsTotal;
-                record.ImportedNetSalary = calculatedNetTotal;
-            }
         }
         catch (Exception ex)
         {

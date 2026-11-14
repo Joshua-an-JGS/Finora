@@ -27,8 +27,14 @@ public class PayslipTemplateConfig
     public int LogoHeightPx { get; set; } = 48;
     public string HeaderAlignment { get; set; } = "Left"; // "Left", "Center", "Split"
     public string DocumentTitle { get; set; } = "PAYSLIP";
-    public string PayslipTitleAlignment { get; set; } = "Center"; // "Left", "Center", "Right"
-    public string EmployeeDetailsSectionHeading { get; set; } = "EMPLOYEE INFORMATION";
+    public string PayslipTitleAlignment { get; set; } = "Left"; // "Left", "Center", "Right"
+    public float? TitleBannerFontSizePt { get; set; } = 12.5f;
+    public string TitleBannerFontWeight { get; set; } = "700";
+    public int TitleBannerTopSpacingPx { get; set; } = 0;
+    public int TitleBannerBottomSpacingPx { get; set; } = 8;
+    public bool ShowTitleBannerDivider { get; set; } = true;
+    public float TitleBannerDividerThicknessPt { get; set; } = 1.0f;
+    public string? TitleBannerDividerColor { get; set; }
     public string PeriodPresentationPrefix { get; set; } = "For the Month of";
     public bool ShowCompanySubtitle { get; set; } = true;
     public bool ShowCompanyAddress { get; set; } = true;
@@ -47,7 +53,20 @@ public class PayslipTemplateConfig
     public string? OverrideCompanyPhone { get; set; }
     public string? OverrideCompanyWebsite { get; set; }
     public string? OverrideLogoDataUrl { get; set; }
-    // Employee Info Section
+    // Employee Info Section & Heading Controls
+    public bool ShowEmployeeDetailsHeading { get; set; } = true;
+    public string EmployeeDetailsSectionHeading { get; set; } = "EMPLOYEE DETAILS";
+    public string EmployeeDetailsHeadingAlignment { get; set; } = "Left"; // "Left", "Center", "Right"
+    public float EmployeeDetailsHeadingFontSizePt { get; set; } = 10.5f;
+    public string EmployeeDetailsHeadingFontWeight { get; set; } = "700";
+    public string? EmployeeDetailsHeadingTextColor { get; set; }
+    public string? EmployeeDetailsHeadingBgColor { get; set; }
+    public int EmployeeDetailsHeadingTopSpacingPx { get; set; } = 6;
+    public int EmployeeDetailsHeadingBottomSpacingPx { get; set; } = 4;
+    public bool ShowEmployeeDetailsHeadingBorder { get; set; } = false;
+    public string? EmployeeDetailsHeadingBorderColor { get; set; } = "#E5E7EB";
+    public float EmployeeDetailsHeadingBorderThicknessPt { get; set; } = 1.0f;
+    public int EmployeeDetailsSectionPaddingPx { get; set; } = 6;
     public int EmployeeDetailsColumns { get; set; } = 2; // 2 or 3 column grid
     public bool ShowEmployeeId { get; set; } = true;
     public bool ShowEmployeeName { get; set; } = true;
