@@ -625,7 +625,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                       <span className="text-[18px] font-bold text-[#1F2937] group-hover:text-[#F47721] transition-colors">
                         {yg.year}
                       </span>
-                      <span className="text-[11.5px] px-2 py-0.5 rounded-[5px] bg-[#FFF3E8] text-[#F47721] font-semibold">
+                      <span className="text-[12px] text-[#F47721] font-medium">
                         {yg.months.filter((m) => m.isImported).length} of 12 Months Imported
                       </span>
                     </div>
@@ -637,12 +637,12 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                           FINORA_DATA/Payroll_Archive/{yg.year}/
                         </code>
                       </span>
-                      <div className="flex items-center gap-1 text-[12px] font-semibold text-[#6B7280] group-hover:text-[#F47721] bg-[#F8F9FA] group-hover:bg-[#FFF3E8] px-2.5 py-1 rounded-[6px] border border-[#E5E7EB] transition-colors">
+                      <div className="flex items-center gap-1 text-[12px] text-[#6B7280] group-hover:text-[#F47721] transition-colors">
                         <span>{isCollapsed ? 'Expand' : 'Collapse'}</span>
                         {isCollapsed ? (
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <ChevronRight className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#F47721]" />
                         ) : (
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#F47721]" />
                         )}
                       </div>
                     </div>
