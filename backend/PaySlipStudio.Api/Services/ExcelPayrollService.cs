@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -1502,11 +1503,60 @@ public class ExcelPayrollService
     }
 
     // ========================================================================
-    // SECTION 15: EXPORT MASTER WORKBOOK (SEPARATE WORKSHEET PER MONTH)
+    // SECTION 15: YEAR-WISE PAYROLL EXPORT CENTRE (SEPARATE WORKSHEET PER MONTH)
     // ========================================================================
-    public async Task<(byte[] FileBytes, string FileName)> ExportMasterWorkbookAsync(bool includeOverrideComparisonColumns = true)
+    public async Task<(byte[] FileBytes, string FileName, string ContentType)> ExportYearArchiveAsync(
+        int year,
+        IEnumerable<int>? selectedMonths = null,
+        bool includeOverrideComparisonColumns = true)
     {
-        var periods = await _db.PayrollPeriods
+        var query = _db.PayrollPeriods
+            .Include(p => p.PayrollRecords)
+                .ThenInclude(r => r.Components)
+            .Include(p => p.PayrollRecords)
+                .ThenInclude(r => r.Employee)
+            .Where(p => p.Year == year && p.PayrollRecords.Any());
+
+        var monthList = selectedMonths?.Where(m => m >= 1 && m <= 12).Distinct().ToList();
+        bool isSelectedMonthsMode = monthList != null && monthList.Count > 0;
+        if (isSelectedMonthsMode)
+        {
+            query = query.Where(p => monthList!.Contains(p.Month));
+        }
+
+        var periods = await query
+            .OrderBy(p => p.Month)
+            .ToListAsync();
+
+        if (periods.Count == 0)
+        {
+            throw new InvalidOperationException($"No payroll records found for year {year} matching the selected month criteria.");
+        }
+
+        using var wb = new XLWorkbook();
+        string summaryTitle = isSelectedMonthsMode
+            ? $"FINORA — SELECTED MONTHS PAYROLL SUMMARY ({year})"
+            : $"FINORA — YEARLY PAYROLL SUMMARY ({year})";
+
+        BuildSummaryWorksheet(wb, year, periods, summaryTitle);
+        BuildMonthlyWorksheets(wb, periods, includeOverrideComparisonColumns);
+
+        using var outStream = new MemoryStream();
+        wb.SaveAs(outStream);
+        var fileBytes = outStream.ToArray();
+
+        string fileName = isSelectedMonthsMode
+            ? $"FINORA_Payroll_{year}_Selected_Months.xlsx"
+            : $"FINORA_Payroll_Archive_{year}.xlsx";
+
+        return (fileBytes, fileName, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    public async Task<(byte[] FileBytes, string FileName, string ContentType)> ExportAllYearsZipAsync(
+        IEnumerable<int>? selectedYears = null,
+        bool includeOverrideComparisonColumns = true)
+    {
+        var allPeriods = await _db.PayrollPeriods
             .Include(p => p.PayrollRecords)
                 .ThenInclude(r => r.Components)
             .Include(p => p.PayrollRecords)
@@ -1516,185 +1566,388 @@ public class ExcelPayrollService
             .ThenBy(p => p.Month)
             .ToListAsync();
 
-        using var wb = new XLWorkbook();
-
-        if (periods.Count == 0)
+        var yearGroups = allPeriods.GroupBy(p => p.Year).OrderByDescending(g => g.Key).ToList();
+        if (selectedYears != null && selectedYears.Any())
         {
-            var emptyWs = wb.Worksheets.Add("No Payroll Data");
-            emptyWs.Cell(1, 1).Value = "FINORA — No payroll periods have been imported yet.";
+            var targetSet = selectedYears.ToHashSet();
+            yearGroups = yearGroups.Where(g => targetSet.Contains(g.Key)).ToList();
         }
-        else
+
+        if (yearGroups.Count == 0)
         {
-            var usedSheetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            throw new InvalidOperationException("No historical payroll records found for the requested years to package into ZIP.");
+        }
 
-            foreach (var period in periods)
+        using var zipMemory = new MemoryStream();
+        using (var archive = new ZipArchive(zipMemory, ZipArchiveMode.Create, true))
+        {
+            foreach (var group in yearGroups)
             {
-                string sheetName = SanitizeWorksheetName(period.PeriodLabel, usedSheetNames);
-                var ws = wb.Worksheets.Add(sheetName);
+                int groupYear = group.Key;
+                var periodsInYear = group.OrderBy(p => p.Month).ToList();
 
-                var records = period.PayrollRecords
-                    .OrderBy(r => r.ImportedEmployeeCode, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                using var yearlyWb = new XLWorkbook();
+                BuildSummaryWorksheet(yearlyWb, groupYear, periodsInYear, $"FINORA — YEARLY PAYROLL SUMMARY ({groupYear})");
+                BuildMonthlyWorksheets(yearlyWb, periodsInYear, includeOverrideComparisonColumns);
 
-                // Build the union of dynamic component columns present in THIS month without forcing a fixed schema across all months
-                var distinctComponents = records
-                    .SelectMany(r => r.Components)
-                    .GroupBy(c => c.ComponentKey, StringComparer.OrdinalIgnoreCase)
-                    .Select(g =>
-                    {
-                        var first = g.OrderBy(x => x.SortOrder).First();
-                        return new
-                        {
-                            Key = g.Key,
-                            Label = !string.IsNullOrWhiteSpace(first.OverrideLabel) ? first.OverrideLabel! : first.OriginalLabel,
-                            Category = first.Category,
-                            MinSort = g.Min(x => x.SortOrder)
-                        };
-                    })
-                    .OrderBy(c => CategorySortPriority(c.Category))
-                    .ThenBy(c => c.MinSort)
-                    .ToList();
+                using var entryStream = new MemoryStream();
+                yearlyWb.SaveAs(entryStream);
+                var wbBytes = entryStream.ToArray();
 
-                // Header Row
-                var headers = new List<string>
-                {
-                    "Employee ID",
-                    "Employee Name",
-                    "Email",
-                    "Department",
-                    "Designation",
-                    "Payroll Month"
-                };
-
-                foreach (var comp in distinctComponents)
-                {
-                    headers.Add(comp.Label);
-                    if (includeOverrideComparisonColumns && records.Any(r =>
-                        r.Components.Any(c => c.ComponentKey.Equals(comp.Key, StringComparison.OrdinalIgnoreCase) && c.HasManualOverride)))
-                    {
-                        headers.Add($"{comp.Label} (Source Imported)");
-                    }
-                }
-
-                headers.Add("Gross Salary");
-                headers.Add("Total Deductions");
-                headers.Add("Net Salary");
-                headers.Add("Record Status");
-                headers.Add("Has Approved Overrides");
-
-                for (int colIdx = 0; colIdx < headers.Count; colIdx++)
-                {
-                    var cell = ws.Cell(1, colIdx + 1);
-                    cell.Value = headers[colIdx];
-                    cell.Style.Font.Bold = true;
-                    cell.Style.Font.FontColor = XLColor.White;
-                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#071747");
-                    cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-                }
-
-                int rowNum = 2;
-                foreach (var rec in records)
-                {
-                    int c = 1;
-                    ws.Cell(rowNum, c++).Value = rec.ImportedEmployeeCode;
-                    ws.Cell(rowNum, c++).Value = rec.OverrideEmployeeName ?? rec.ImportedEmployeeName;
-                    ws.Cell(rowNum, c++).Value = rec.OverrideEmail ?? rec.ImportedEmail;
-                    ws.Cell(rowNum, c++).Value = rec.OverrideDepartment ?? rec.ImportedDepartment;
-                    ws.Cell(rowNum, c++).Value = rec.OverrideDesignation ?? rec.ImportedDesignation;
-                    ws.Cell(rowNum, c++).Value = period.PeriodLabel;
-
-                    bool anyOverride = rec.OverrideGrossSalary.HasValue || rec.OverrideTotalDeductions.HasValue || rec.OverrideNetSalary.HasValue;
-
-                    foreach (var compMeta in distinctComponents)
-                    {
-                        var compVal = rec.Components.FirstOrDefault(x =>
-                            x.ComponentKey.Equals(compMeta.Key, StringComparison.OrdinalIgnoreCase));
-
-                        var targetCell = ws.Cell(rowNum, c++);
-                        if (compVal != null)
-                        {
-                            if (compVal.HasManualOverride) anyOverride = true;
-
-                            if (compVal.Category == ComponentCategories.CustomText)
-                            {
-                                var textVal = compVal.HasManualOverride ? compVal.OverrideTextValue : compVal.ImportedTextValue;
-                                if (!string.IsNullOrWhiteSpace(textVal))
-                                {
-                                    targetCell.Value = textVal;
-                                }
-                            }
-                            else
-                            {
-                                var numVal = compVal.HasManualOverride ? compVal.OverrideNumericValue : compVal.ImportedNumericValue;
-                                if (numVal.HasValue)
-                                {
-                                    targetCell.Value = numVal.Value;
-                                    targetCell.Style.NumberFormat.Format = "#,##0.00";
-                                }
-                                // Note: if numVal is null (blank in source), leave cell genuinely blank!
-                            }
-                        }
-
-                        // Optional source-imported comparison column if any employee in this month overrode this component
-                        if (includeOverrideComparisonColumns && records.Any(r =>
-                            r.Components.Any(x => x.ComponentKey.Equals(compMeta.Key, StringComparison.OrdinalIgnoreCase) && x.HasManualOverride)))
-                        {
-                            var srcCell = ws.Cell(rowNum, c++);
-                            if (compVal?.ImportedNumericValue != null)
-                            {
-                                srcCell.Value = compVal.ImportedNumericValue.Value;
-                                srcCell.Style.NumberFormat.Format = "#,##0.00";
-                            }
-                            else if (!string.IsNullOrWhiteSpace(compVal?.ImportedTextValue))
-                            {
-                                srcCell.Value = compVal.ImportedTextValue;
-                            }
-                        }
-                    }
-
-                    var grossCell = ws.Cell(rowNum, c++);
-                    var effGross = rec.OverrideGrossSalary ?? rec.ImportedGrossSalary;
-                    if (effGross.HasValue)
-                    {
-                        grossCell.Value = effGross.Value;
-                        grossCell.Style.NumberFormat.Format = "#,##0.00";
-                        grossCell.Style.Font.Bold = true;
-                    }
-
-                    var dedCell = ws.Cell(rowNum, c++);
-                    var effDed = rec.OverrideTotalDeductions ?? rec.ImportedTotalDeductions;
-                    if (effDed.HasValue)
-                    {
-                        dedCell.Value = effDed.Value;
-                        dedCell.Style.NumberFormat.Format = "#,##0.00";
-                    }
-
-                    var netCell = ws.Cell(rowNum, c++);
-                    var effNet = rec.OverrideNetSalary ?? rec.ImportedNetSalary;
-                    if (effNet.HasValue)
-                    {
-                        netCell.Value = effNet.Value;
-                        netCell.Style.NumberFormat.Format = "#,##0.00";
-                        netCell.Style.Font.Bold = true;
-                        netCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF4E8");
-                    }
-
-                    ws.Cell(rowNum, c++).Value = rec.Status;
-                    ws.Cell(rowNum, c++).Value = anyOverride ? "Yes" : "No";
-
-                    rowNum++;
-                }
-
-                ws.Columns().AdjustToContents(1, Math.Max(2, rowNum - 1), 10.0, 42.0);
-                ws.SheetView.FreezeRows(1);
+                var entry = archive.CreateEntry($"FINORA_Payroll_Archive_{groupYear}.xlsx", CompressionLevel.Optimal);
+                using var entryWriter = entry.Open();
+                entryWriter.Write(wbBytes, 0, wbBytes.Length);
             }
         }
 
-        using var outStream = new MemoryStream();
-        wb.SaveAs(outStream);
-        var fileBytes = outStream.ToArray();
-        var fileName = $"PaySlip_Studio_Master_Payroll_Archive_{DateTime.UtcNow:yyyyMMdd}.xlsx";
-        return (fileBytes, fileName);
+        var zipBytes = zipMemory.ToArray();
+        return (zipBytes, "FINORA_All_Years_Payroll_Archive.zip", "application/zip");
+    }
+
+    public async Task<(byte[] FileBytes, string FileName)> ExportMasterWorkbookAsync(bool includeOverrideComparisonColumns = true)
+    {
+        var yearsDto = await _yearService.GetAvailableYearsAsync();
+        int targetYear = yearsDto.AvailableYears.FirstOrDefault(yearsDto.ActiveYear > 0 ? yearsDto.ActiveYear : DateTime.UtcNow.Year);
+
+        // Check if records exist for targetYear
+        bool hasRecords = await _db.PayrollPeriods.AnyAsync(p => p.Year == targetYear && p.PayrollRecords.Any());
+        if (!hasRecords)
+        {
+            // If targetYear has no records, fallback to any year that has records
+            var anyYearWithRecords = await _db.PayrollPeriods
+                .Where(p => p.PayrollRecords.Any())
+                .OrderByDescending(p => p.Year)
+                .Select(p => p.Year)
+                .FirstOrDefaultAsync();
+
+            if (anyYearWithRecords > 0)
+            {
+                targetYear = anyYearWithRecords;
+            }
+        }
+
+        try
+        {
+            var res = await ExportYearArchiveAsync(targetYear, null, includeOverrideComparisonColumns);
+            return (res.FileBytes, res.FileName);
+        }
+        catch
+        {
+            using var emptyWb = new XLWorkbook();
+            var emptyWs = emptyWb.Worksheets.Add("No Payroll Data");
+            emptyWs.Cell(1, 1).Value = "FINORA — No payroll periods have been imported yet.";
+            using var ms = new MemoryStream();
+            emptyWb.SaveAs(ms);
+            return (ms.ToArray(), $"FINORA_Payroll_Archive_{DateTime.UtcNow:yyyy}.xlsx");
+        }
+    }
+
+    private void BuildSummaryWorksheet(
+        XLWorkbook wb,
+        int year,
+        List<PayrollPeriod> exportedPeriods,
+        string title)
+    {
+        var ws = wb.Worksheets.Add("Yearly Payroll Summary");
+        ws.Position = 1;
+
+        // 1. Title Banner
+        ws.Cell(1, 1).Value = title;
+        ws.Cell(1, 1).Style.Font.Bold = true;
+        ws.Cell(1, 1).Style.Font.FontSize = 14;
+        ws.Cell(1, 1).Style.Font.FontColor = XLColor.White;
+        ws.Range(1, 1, 1, 6).Merge();
+        ws.Range(1, 1, 1, 6).Style.Fill.BackgroundColor = XLColor.FromHtml("#071747");
+        ws.Row(1).Height = 32;
+        ws.Cell(1, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+        // 2. Subtitle
+        ws.Cell(2, 1).Value = $"Generated on: {DateTime.Now:dd/MM/yyyy HH:mm} | Authoritative Source: Verified Database Records | Organization: FINORA Enterprise";
+        ws.Cell(2, 1).Style.Font.Italic = true;
+        ws.Cell(2, 1).Style.Font.FontSize = 9.5;
+        ws.Cell(2, 1).Style.Font.FontColor = XLColor.FromHtml("#6B7280");
+        ws.Range(2, 1, 2, 6).Merge();
+
+        // 3. Totals Aggregation
+        int totalEmployees = exportedPeriods.Sum(p => p.PayrollRecords.Count);
+        decimal totalGross = exportedPeriods.Sum(p => p.PayrollRecords.Sum(r => (r.OverrideGrossSalary ?? r.ImportedGrossSalary) ?? 0m));
+        decimal totalDeductions = exportedPeriods.Sum(p => p.PayrollRecords.Sum(r => (r.OverrideTotalDeductions ?? r.ImportedTotalDeductions) ?? 0m));
+        decimal totalNet = exportedPeriods.Sum(p => p.PayrollRecords.Sum(r => (r.OverrideNetSalary ?? r.ImportedNetSalary) ?? 0m));
+
+        // 4. Summary KPI Box
+        int kpiStart = 4;
+        void SetKpiRow(int row, string label, object value, bool isCurrency = false, bool isHighlighted = false)
+        {
+            ws.Cell(row, 1).Value = label;
+            ws.Cell(row, 1).Style.Font.Bold = true;
+            ws.Cell(row, 1).Style.Font.FontSize = 10;
+            ws.Cell(row, 1).Style.Font.FontColor = XLColor.FromHtml("#374151");
+
+            var valCell = ws.Cell(row, 2);
+            valCell.Value = value is decimal decVal ? decVal : value.ToString();
+            valCell.Style.Font.Bold = true;
+            valCell.Style.Font.FontSize = 10.5;
+            if (isCurrency)
+            {
+                valCell.Style.NumberFormat.Format = "₹ #,##0.00";
+            }
+            if (isHighlighted)
+            {
+                valCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF4E8");
+                valCell.Style.Font.FontColor = XLColor.FromHtml("#F47721");
+            }
+        }
+
+        SetKpiRow(kpiStart, "Selected Payroll Year", year);
+        SetKpiRow(kpiStart + 1, "Exported Payroll Months", $"{exportedPeriods.Count} month(s)");
+        SetKpiRow(kpiStart + 2, "Total Employee Records", totalEmployees);
+        SetKpiRow(kpiStart + 3, "Total Gross Payroll", totalGross, isCurrency: true);
+        SetKpiRow(kpiStart + 4, "Total Deductions", totalDeductions, isCurrency: true);
+        SetKpiRow(kpiStart + 5, "Total Net Payroll", totalNet, isCurrency: true, isHighlighted: true);
+
+        // 5. Monthly Breakdown Table
+        int tableHeaderRow = kpiStart + 7;
+        ws.Cell(tableHeaderRow - 1, 1).Value = "MONTHLY PAYROLL BREAKDOWN";
+        ws.Cell(tableHeaderRow - 1, 1).Style.Font.Bold = true;
+        ws.Cell(tableHeaderRow - 1, 1).Style.Font.FontSize = 11;
+        ws.Cell(tableHeaderRow - 1, 1).Style.Font.FontColor = XLColor.FromHtml("#F47721");
+
+        var headers = new[]
+        {
+            "Payroll Month",
+            "Employee Count",
+            "Total Gross Payroll",
+            "Total Deductions",
+            "Total Net Payroll",
+            "Worksheet Tab Name"
+        };
+
+        for (int col = 0; col < headers.Length; col++)
+        {
+            var cell = ws.Cell(tableHeaderRow, col + 1);
+            cell.Value = headers[col];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#071747");
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        }
+        ws.Row(tableHeaderRow).Height = 24;
+
+        int curRow = tableHeaderRow + 1;
+        foreach (var period in exportedPeriods.OrderBy(p => p.Month))
+        {
+            int empCount = period.PayrollRecords.Count;
+            decimal monthGross = period.PayrollRecords.Sum(r => (r.OverrideGrossSalary ?? r.ImportedGrossSalary) ?? 0m);
+            decimal monthDed = period.PayrollRecords.Sum(r => (r.OverrideTotalDeductions ?? r.ImportedTotalDeductions) ?? 0m);
+            decimal monthNet = period.PayrollRecords.Sum(r => (r.OverrideNetSalary ?? r.ImportedNetSalary) ?? 0m);
+
+            ws.Cell(curRow, 1).Value = period.PeriodLabel;
+            ws.Cell(curRow, 2).Value = empCount;
+            ws.Cell(curRow, 3).Value = monthGross;
+            ws.Cell(curRow, 3).Style.NumberFormat.Format = "#,##0.00";
+            ws.Cell(curRow, 4).Value = monthDed;
+            ws.Cell(curRow, 4).Style.NumberFormat.Format = "#,##0.00";
+            ws.Cell(curRow, 5).Value = monthNet;
+            ws.Cell(curRow, 5).Style.NumberFormat.Format = "#,##0.00";
+            ws.Cell(curRow, 5).Style.Font.Bold = true;
+            ws.Cell(curRow, 6).Value = period.PeriodLabel;
+            curRow++;
+        }
+
+        // Totals Row
+        ws.Cell(curRow, 1).Value = "Total Annual Payroll";
+        ws.Cell(curRow, 1).Style.Font.Bold = true;
+        ws.Cell(curRow, 2).Value = totalEmployees;
+        ws.Cell(curRow, 2).Style.Font.Bold = true;
+        ws.Cell(curRow, 3).Value = totalGross;
+        ws.Cell(curRow, 3).Style.Font.Bold = true;
+        ws.Cell(curRow, 3).Style.NumberFormat.Format = "#,##0.00";
+        ws.Cell(curRow, 4).Value = totalDeductions;
+        ws.Cell(curRow, 4).Style.Font.Bold = true;
+        ws.Cell(curRow, 4).Style.NumberFormat.Format = "#,##0.00";
+        ws.Cell(curRow, 5).Value = totalNet;
+        ws.Cell(curRow, 5).Style.Font.Bold = true;
+        ws.Cell(curRow, 5).Style.NumberFormat.Format = "#,##0.00";
+        ws.Cell(curRow, 5).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF4E8");
+        ws.Range(curRow, 1, curRow, 6).Style.Border.TopBorder = XLBorderStyleValues.Thin;
+        ws.Range(curRow, 1, curRow, 6).Style.Border.BottomBorder = XLBorderStyleValues.Double;
+
+        ws.Columns().AdjustToContents(1, curRow, 12.0, 36.0);
+    }
+
+    private void BuildMonthlyWorksheets(
+        XLWorkbook wb,
+        List<PayrollPeriod> periods,
+        bool includeOverrideComparisonColumns)
+    {
+        var usedSheetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var period in periods.OrderBy(p => p.Month))
+        {
+            string sheetName = SanitizeWorksheetName(period.PeriodLabel, usedSheetNames);
+            var ws = wb.Worksheets.Add(sheetName);
+
+            var records = period.PayrollRecords
+                .OrderBy(r => r.ImportedEmployeeCode, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Build the union of dynamic component columns present in THIS month without forcing a fixed schema across all months
+            var distinctComponents = records
+                .SelectMany(r => r.Components)
+                .GroupBy(c => c.ComponentKey, StringComparer.OrdinalIgnoreCase)
+                .Select(g =>
+                {
+                    var first = g.OrderBy(x => x.SortOrder).First();
+                    return new
+                    {
+                        Key = g.Key,
+                        Label = !string.IsNullOrWhiteSpace(first.OverrideLabel) ? first.OverrideLabel! : first.OriginalLabel,
+                        Category = first.Category,
+                        MinSort = g.Min(x => x.SortOrder)
+                    };
+                })
+                .OrderBy(c => CategorySortPriority(c.Category))
+                .ThenBy(c => c.MinSort)
+                .ToList();
+
+            // Header Row
+            var headers = new List<string>
+            {
+                "Employee ID",
+                "Employee Name",
+                "Email",
+                "Department",
+                "Designation",
+                "Payroll Month"
+            };
+
+            foreach (var comp in distinctComponents)
+            {
+                headers.Add(comp.Label);
+                if (includeOverrideComparisonColumns && records.Any(r =>
+                    r.Components.Any(c => c.ComponentKey.Equals(comp.Key, StringComparison.OrdinalIgnoreCase) && c.HasManualOverride)))
+                {
+                    headers.Add($"{comp.Label} (Source Imported)");
+                }
+            }
+
+            headers.Add("Gross Salary");
+            headers.Add("Total Deductions");
+            headers.Add("Net Salary");
+            headers.Add("Record Status");
+            headers.Add("Has Approved Overrides");
+
+            for (int colIdx = 0; colIdx < headers.Count; colIdx++)
+            {
+                var cell = ws.Cell(1, colIdx + 1);
+                cell.Value = headers[colIdx];
+                cell.Style.Font.Bold = true;
+                cell.Style.Font.FontColor = XLColor.White;
+                cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#071747");
+                cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            }
+            ws.Row(1).Height = 24;
+
+            int rowNum = 2;
+            foreach (var rec in records)
+            {
+                int c = 1;
+                ws.Cell(rowNum, c++).Value = rec.ImportedEmployeeCode;
+                ws.Cell(rowNum, c++).Value = rec.OverrideEmployeeName ?? rec.ImportedEmployeeName;
+                ws.Cell(rowNum, c++).Value = rec.OverrideEmail ?? rec.ImportedEmail;
+                ws.Cell(rowNum, c++).Value = rec.OverrideDepartment ?? rec.ImportedDepartment;
+                ws.Cell(rowNum, c++).Value = rec.OverrideDesignation ?? rec.ImportedDesignation;
+                ws.Cell(rowNum, c++).Value = period.PeriodLabel;
+
+                bool anyOverride = rec.OverrideGrossSalary.HasValue || rec.OverrideTotalDeductions.HasValue || rec.OverrideNetSalary.HasValue;
+
+                foreach (var compMeta in distinctComponents)
+                {
+                    var compVal = rec.Components.FirstOrDefault(x =>
+                        x.ComponentKey.Equals(compMeta.Key, StringComparison.OrdinalIgnoreCase));
+
+                    var targetCell = ws.Cell(rowNum, c++);
+                    if (compVal != null)
+                    {
+                        if (compVal.HasManualOverride) anyOverride = true;
+
+                        if (compVal.Category == ComponentCategories.CustomText)
+                        {
+                            var textVal = compVal.HasManualOverride ? compVal.OverrideTextValue : compVal.ImportedTextValue;
+                            if (!string.IsNullOrWhiteSpace(textVal))
+                            {
+                                targetCell.Value = textVal;
+                            }
+                        }
+                        else
+                        {
+                            var numVal = compVal.HasManualOverride ? compVal.OverrideNumericValue : compVal.ImportedNumericValue;
+                            if (numVal.HasValue)
+                            {
+                                targetCell.Value = numVal.Value;
+                                targetCell.Style.NumberFormat.Format = "#,##0.00";
+                            }
+                        }
+                    }
+
+                    // Optional source-imported comparison column if any employee in this month overrode this component
+                    if (includeOverrideComparisonColumns && records.Any(r =>
+                        r.Components.Any(x => x.ComponentKey.Equals(compMeta.Key, StringComparison.OrdinalIgnoreCase) && x.HasManualOverride)))
+                    {
+                        var srcCell = ws.Cell(rowNum, c++);
+                        if (compVal?.ImportedNumericValue != null)
+                        {
+                            srcCell.Value = compVal.ImportedNumericValue.Value;
+                            srcCell.Style.NumberFormat.Format = "#,##0.00";
+                        }
+                        else if (!string.IsNullOrWhiteSpace(compVal?.ImportedTextValue))
+                        {
+                            srcCell.Value = compVal.ImportedTextValue;
+                        }
+                    }
+                }
+
+                var grossCell = ws.Cell(rowNum, c++);
+                var effGross = rec.OverrideGrossSalary ?? rec.ImportedGrossSalary;
+                if (effGross.HasValue)
+                {
+                    grossCell.Value = effGross.Value;
+                    grossCell.Style.NumberFormat.Format = "#,##0.00";
+                    grossCell.Style.Font.Bold = true;
+                }
+
+                var dedCell = ws.Cell(rowNum, c++);
+                var effDed = rec.OverrideTotalDeductions ?? rec.ImportedTotalDeductions;
+                if (effDed.HasValue)
+                {
+                    dedCell.Value = effDed.Value;
+                    dedCell.Style.NumberFormat.Format = "#,##0.00";
+                }
+
+                var netCell = ws.Cell(rowNum, c++);
+                var effNet = rec.OverrideNetSalary ?? rec.ImportedNetSalary;
+                if (effNet.HasValue)
+                {
+                    netCell.Value = effNet.Value;
+                    netCell.Style.NumberFormat.Format = "#,##0.00";
+                    netCell.Style.Font.Bold = true;
+                    netCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF4E8");
+                }
+
+                ws.Cell(rowNum, c++).Value = rec.Status;
+                ws.Cell(rowNum, c++).Value = anyOverride ? "Yes" : "No";
+
+                rowNum++;
+            }
+
+            if (rowNum > 2 && headers.Count > 0)
+            {
+                ws.Range(1, 1, rowNum - 1, headers.Count).SetAutoFilter();
+            }
+
+            ws.Columns().AdjustToContents(1, Math.Max(2, rowNum - 1), 10.0, 42.0);
+            ws.SheetView.FreezeRows(1);
+        }
     }
 
     // ========================================================================

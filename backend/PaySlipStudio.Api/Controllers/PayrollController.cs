@@ -1223,26 +1223,173 @@ public class PayrollController : ControllerBase
     }
 
     // ========================================================================
-    // MASTER MULTI-SHEET EXCEL WORKBOOK EXPORT (Section 15)
+    // MASTER PAYROLL EXPORT CENTRE (Section 15)
     // ========================================================================
-    [HttpGet("export/master-workbook")]
-    public async Task<IActionResult> ExportMasterWorkbook([FromQuery] bool includeOverridesComparison = true)
+    [HttpGet("export/centre-summary")]
+    public async Task<IActionResult> GetExportCentreSummary()
     {
-        var (fileBytes, fileName) = await _excelService.ExportMasterWorkbookAsync(includeOverridesComparison);
+        var yearsDto = await _yearService.GetAvailableYearsAsync();
+        var allPeriods = await _db.PayrollPeriods
+            .AsNoTracking()
+            .Include(p => p.PayrollRecords)
+            .OrderByDescending(p => p.Year)
+            .ThenBy(p => p.Month)
+            .ToListAsync();
 
-        await _audit.RecordAsync(
-            CurrentUserId,
-            CurrentUserName,
-            CurrentUserRole,
-            "Payroll.ExportMasterWorkbook",
-            "MasterWorkbook",
-            fileName,
-            $"Exported multi-sheet Master Payroll Archive Workbook ('{fileName}').");
+        var settings = await _db.CompanySettings.AsNoTracking().FirstOrDefaultAsync();
+        int activeYear = settings?.ActivePayrollYear ?? (yearsDto.AvailableYears.FirstOrDefault(DateTime.UtcNow.Year));
+        int activeMonth = settings?.ActivePayrollMonth ?? DateTime.UtcNow.Month;
 
-        return File(
-            fileBytes,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            fileName);
+        var yearSummaries = new List<object>();
+        foreach (var yr in yearsDto.AvailableYears)
+        {
+            var periodsInYear = allPeriods.Where(p => p.Year == yr).ToList();
+            var monthsData = new List<object>();
+
+            for (int m = 1; m <= 12; m++)
+            {
+                var periodMatch = periodsInYear.FirstOrDefault(p => p.Month == m);
+                int empCount = periodMatch?.PayrollRecords.Count ?? 0;
+                decimal totalGross = periodMatch?.PayrollRecords.Sum(r => (r.OverrideGrossSalary ?? r.ImportedGrossSalary) ?? 0m) ?? 0m;
+                decimal totalNet = periodMatch?.PayrollRecords.Sum(r => (r.OverrideNetSalary ?? r.ImportedNetSalary) ?? 0m) ?? 0m;
+
+                monthsData.Add(new
+                {
+                    month = m,
+                    periodLabel = ExcelPayrollService.FormatPeriodLabel(m, yr),
+                    employeeCount = empCount,
+                    totalGross,
+                    totalNet,
+                    hasRecords = empCount > 0
+                });
+            }
+
+            var periodsWithRecords = periodsInYear.Where(p => p.PayrollRecords.Count > 0).ToList();
+            yearSummaries.Add(new
+            {
+                year = yr,
+                totalMonthsWithRecords = periodsWithRecords.Count,
+                totalEmployees = periodsWithRecords.Sum(p => p.PayrollRecords.Count),
+                totalGross = periodsWithRecords.Sum(p => p.PayrollRecords.Sum(r => (r.OverrideGrossSalary ?? r.ImportedGrossSalary) ?? 0m)),
+                totalNet = periodsWithRecords.Sum(p => p.PayrollRecords.Sum(r => (r.OverrideNetSalary ?? r.ImportedNetSalary) ?? 0m)),
+                months = monthsData
+            });
+        }
+
+        return Ok(new
+        {
+            activeYear,
+            activeMonth,
+            availableYears = yearsDto.AvailableYears,
+            yearSummaries
+        });
+    }
+
+    [HttpGet("export/master-workbook")]
+    [HttpGet("export/year-archive")]
+    public async Task<IActionResult> ExportMasterWorkbook(
+        [FromQuery] int? year = null,
+        [FromQuery] string? months = null,
+        [FromQuery] string? mode = null,
+        [FromQuery] bool? allYearsZip = null,
+        [FromQuery] string? years = null,
+        [FromQuery] bool includeOverridesComparison = true)
+    {
+        try
+        {
+            bool isAllYearsZip = string.Equals(mode, "allYearsZip", StringComparison.OrdinalIgnoreCase) || allYearsZip == true;
+
+            if (isAllYearsZip)
+            {
+                List<int>? targetYears = null;
+                if (!string.IsNullOrWhiteSpace(years))
+                {
+                    targetYears = years.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Select(s => int.TryParse(s, out var y) ? y : 0)
+                        .Where(y => y > 0)
+                        .ToList();
+                }
+
+                var (zipBytes, zipFileName, zipContentType) = await _excelService.ExportAllYearsZipAsync(
+                    targetYears,
+                    includeOverridesComparison);
+
+                await _audit.RecordAsync(
+                    CurrentUserId,
+                    CurrentUserName,
+                    CurrentUserRole,
+                    "Payroll.ExportAllYearsZip",
+                    "ArchiveZip",
+                    zipFileName,
+                    $"Exported All Years Payroll Archive ZIP ('{zipFileName}').");
+
+                return File(zipBytes, zipContentType, zipFileName);
+            }
+
+            // Single Year / Selected Months
+            int targetYear;
+            if (year.HasValue && year.Value > 0)
+            {
+                targetYear = year.Value;
+            }
+            else
+            {
+                var yearsDto = await _yearService.GetAvailableYearsAsync();
+                targetYear = yearsDto.AvailableYears.FirstOrDefault(yearsDto.ActiveYear > 0 ? yearsDto.ActiveYear : DateTime.UtcNow.Year);
+
+                // If targetYear has no records, check any period with records
+                bool targetHasRecords = await _db.PayrollPeriods.AnyAsync(p => p.Year == targetYear && p.PayrollRecords.Any());
+                if (!targetHasRecords)
+                {
+                    var fallbackYear = await _db.PayrollPeriods
+                        .Where(p => p.PayrollRecords.Any())
+                        .OrderByDescending(p => p.Year)
+                        .Select(p => p.Year)
+                        .FirstOrDefaultAsync();
+                    if (fallbackYear > 0)
+                    {
+                        targetYear = fallbackYear;
+                    }
+                }
+            }
+
+            List<int>? selectedMonthsList = null;
+            if (!string.IsNullOrWhiteSpace(months))
+            {
+                selectedMonthsList = months.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(s => int.TryParse(s, out var m) ? m : 0)
+                    .Where(m => m >= 1 && m <= 12)
+                    .ToList();
+            }
+            else if (string.Equals(mode, "selectedMonths", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Please select at least one month with available payroll records." });
+            }
+
+            var (fileBytes, fileName, contentType) = await _excelService.ExportYearArchiveAsync(
+                targetYear,
+                selectedMonthsList,
+                includeOverridesComparison);
+
+            await _audit.RecordAsync(
+                CurrentUserId,
+                CurrentUserName,
+                CurrentUserRole,
+                "Payroll.ExportMasterWorkbook",
+                "YearArchive",
+                fileName,
+                $"Exported Year-wise Payroll Archive ('{fileName}').");
+
+            return File(fileBytes, contentType, fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Export failed: {ex.Message}" });
+        }
     }
 }
 

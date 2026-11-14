@@ -28,6 +28,9 @@ import {
   KeyRound,
   Check,
   X,
+  Calendar,
+  FolderArchive,
+  Layers,
 } from 'lucide-react';
 import { apiRequest, getAuthorizedDownloadUrl } from '../services/api';
 import { getPayrollYears, onYearsUpdated } from '../services/payrollYears';
@@ -1573,92 +1576,657 @@ export const SentHistoryView: React.FC<{ canEdit: boolean }> = ({ canEdit }) => 
 };
 
 // ============================================================================
-// 7. REPORTS & EXPORTS VIEW
+// 7. REPORTS & EXPORTS VIEW — MASTER PAYROLL EXPORT CENTRE
 // ============================================================================
 export const ReportsAndExportsView: React.FC<{
   activeMonth?: number;
   activeYear?: number;
 }> = () => {
+  const [centreSummary, setCentreSummary] = useState<any | null>(null);
   const [periodsData, setPeriodsData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Export Centre State
+  const [availableYears, setAvailableYears] = useState<number[]>([2028, 2027, 2026, 2025]);
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [exportMode, setExportMode] = useState<'fullYear' | 'selectedMonths' | 'allYearsZip'>('fullYear');
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
+  const [selectedZipYears, setSelectedZipYears] = useState<number[]>([]);
   const [includeOverridesComparison, setIncludeOverridesComparison] = useState(true);
+  const [archiveFilterYear, setArchiveFilterYear] = useState<number | 'all'>('all');
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [summaryRes, periodsRes] = await Promise.allSettled([
+        apiRequest<any>('/api/payroll/export/centre-summary'),
+        apiRequest<any>('/api/payroll/periods'),
+      ]);
+
+      let yearsList: number[] = [];
+      let defaultYr = 2026;
+
+      if (summaryRes.status === 'fulfilled' && summaryRes.value) {
+        setCentreSummary(summaryRes.value);
+        if (Array.isArray(summaryRes.value.availableYears) && summaryRes.value.availableYears.length > 0) {
+          yearsList = summaryRes.value.availableYears;
+          defaultYr = summaryRes.value.activeYear || yearsList[0];
+        }
+      }
+
+      if (periodsRes.status === 'fulfilled' && periodsRes.value) {
+        setPeriodsData(periodsRes.value);
+        if (yearsList.length === 0 && Array.isArray(periodsRes.value.availableYears)) {
+          yearsList = periodsRes.value.availableYears;
+          defaultYr = periodsRes.value.activeYear || yearsList[0];
+        }
+      }
+
+      if (yearsList.length > 0) {
+        setAvailableYears(yearsList);
+        setSelectedYear((prev) => (yearsList.includes(prev) ? prev : defaultYr));
+        setSelectedZipYears(yearsList);
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    apiRequest('/api/payroll/periods').then(setPeriodsData).catch(() => {});
+    loadData();
+    const unsub = onYearsUpdated(() => loadData());
+    return () => unsub();
   }, []);
 
+  // When selectedYear changes, auto-select all available months for that year in Mode B
+  const curYearData = centreSummary?.yearSummaries?.find((y: any) => y.year === selectedYear);
+  const availableMonthsInYear: any[] = curYearData?.months?.filter((m: any) => m.hasRecords) || [];
+
+  useEffect(() => {
+    if (availableMonthsInYear.length > 0) {
+      setSelectedMonths(availableMonthsInYear.map((m: any) => m.month));
+    } else {
+      setSelectedMonths([]);
+    }
+  }, [selectedYear, centreSummary]);
+
+  // Derived counts for export summary
+  const availableMonthsCount = availableMonthsInYear.length;
+  const selectedMonthsCount = exportMode === 'fullYear' ? availableMonthsCount : selectedMonths.length;
+
+  const totalEmployeesForExport = (() => {
+    if (exportMode === 'allYearsZip') {
+      const targetYearsData = (centreSummary?.yearSummaries || []).filter((y: any) => selectedZipYears.includes(y.year));
+      return targetYearsData.reduce((acc: number, y: any) => acc + (y.totalEmployees || 0), 0);
+    }
+    if (exportMode === 'fullYear') {
+      return curYearData?.totalEmployees || 0;
+    }
+    // selectedMonths
+    const selectedMonthsData = (curYearData?.months || []).filter((m: any) => selectedMonths.includes(m.month));
+    return selectedMonthsData.reduce((acc: number, m: any) => acc + (m.employeeCount || 0), 0);
+  })();
+
+  const outputFileName = (() => {
+    if (exportMode === 'allYearsZip') return 'FINORA_All_Years_Payroll_Archive.zip';
+    if (exportMode === 'selectedMonths') return `FINORA_Payroll_${selectedYear}_Selected_Months.xlsx`;
+    return `FINORA_Payroll_Archive_${selectedYear}.xlsx`;
+  })();
+
+  const canDownload = (() => {
+    if (exportMode === 'allYearsZip') {
+      return selectedZipYears.length > 0 && totalEmployeesForExport > 0;
+    }
+    if (exportMode === 'fullYear') {
+      return availableMonthsCount > 0 && totalEmployeesForExport > 0;
+    }
+    return selectedMonths.length > 0 && totalEmployeesForExport > 0;
+  })();
+
+  const handleDownload = () => {
+    if (!canDownload) {
+      setFeedback({
+        type: 'error',
+        message: 'No valid payroll records found for the selected export criteria.',
+      });
+      return;
+    }
+
+    let downloadUrl = '';
+    if (exportMode === 'allYearsZip') {
+      downloadUrl = `/api/payroll/export/master-workbook?mode=allYearsZip&years=${selectedZipYears.join(',')}&includeOverridesComparison=${includeOverridesComparison}`;
+    } else if (exportMode === 'selectedMonths') {
+      downloadUrl = `/api/payroll/export/master-workbook?year=${selectedYear}&mode=selectedMonths&months=${selectedMonths.join(',')}&includeOverridesComparison=${includeOverridesComparison}`;
+    } else {
+      // Full Year
+      downloadUrl = `/api/payroll/export/master-workbook?year=${selectedYear}&mode=fullYear&includeOverridesComparison=${includeOverridesComparison}`;
+    }
+
+    setFeedback({
+      type: 'info',
+      message: `Generating ${outputFileName}... Download will start shortly.`,
+    });
+
+    const fullUrl = getAuthorizedDownloadUrl(downloadUrl);
+    window.open(fullUrl, '_blank');
+
+    setTimeout(() => {
+      setFeedback(null);
+    }, 6000);
+  };
+
+  // Archive table filtering
+  const allArchivePeriods: any[] = periodsData?.periods || [];
+  const filteredArchivePeriods =
+    archiveFilterYear === 'all'
+      ? allArchivePeriods
+      : allArchivePeriods.filter((p: any) => p.year === archiveFilterYear);
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-[24px] font-semibold text-[#1F2937]">Reports & Exports</h1>
+        <h1 className="text-[24px] font-semibold text-[#1F2937] flex items-center gap-2">
+          <span>Reports &amp; Exports</span>
+          {loading && <RefreshCw className="w-4 h-4 text-[#F47721] animate-spin" />}
+        </h1>
         <p className="text-[13px] text-[#6B7280]">
-          Generate a single multi-worksheet Excel workbook containing every historical payroll month.
+          Export organized payroll records by year, with each available payroll month maintained in a separate worksheet.
         </p>
       </div>
 
-      <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="max-w-2xl space-y-2">
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-[#F47721]" />
-            <h3 className="text-[16px] font-semibold text-[#1F2937]">
-              Master Multi-Worksheet Payroll Archive Workbook (.xlsx)
-            </h3>
+      {feedback && (
+        <div
+          className={`p-3.5 rounded-[8px] text-[13px] border flex items-center justify-between ${
+            feedback.type === 'success'
+              ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
+              : feedback.type === 'error'
+              ? 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
+              : 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]'
+          }`}
+        >
+          <span>{feedback.message}</span>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            className="text-[12px] font-semibold underline hover:opacity-75"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* MASTER PAYROLL EXPORT CENTRE */}
+      <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] p-6 space-y-6 shadow-xs">
+        {/* Card Title & Overview */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#E5E7EB]">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <FolderArchive className="w-5 h-5 text-[#F47721]" />
+              <h2 className="text-[17px] font-bold text-[#1F2937]">MASTER PAYROLL EXPORT CENTRE</h2>
+            </div>
+            <p className="text-[13px] text-[#6B7280]">
+              Export your historical payroll data in organized year-wise Excel workbooks.
+            </p>
           </div>
-          <p className="text-[13px] text-[#6B7280]">
-            Generates a single consolidated Excel workbook with a separate worksheet tab for each payroll month (e.g., September 2026, October 2026, November 2026), preserving employee-specific dynamic salary columns.
-          </p>
-          <label className="flex items-center gap-2 text-[13px] font-medium text-[#1F2937] pt-1 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeOverridesComparison}
-              onChange={(e) => setIncludeOverridesComparison(e.target.checked)}
-            />
-            <span>Include source-imported comparison columns alongside manual overrides</span>
-          </label>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FFF3E8] border border-[#FED7AA] text-[12px] font-semibold text-[#F47721]">
+            <CheckCircle2 className="w-4 h-4 text-[#F47721]" />
+            <span>Authoritative Processed Records Source</span>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            window.open(
-              getAuthorizedDownloadUrl(
-                `/api/payroll/export/master-workbook?includeOverridesComparison=${includeOverridesComparison}`
-              ),
-              '_blank'
-            )
-          }
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[7px] bg-[#F47721] text-[#FFFFFF] text-[13px] font-semibold hover:bg-[#E06612]"
-        >
-          <FileDown className="w-4 h-4" />
-          <span>Download Master Excel Workbook</span>
-        </button>
+        {/* 1. SELECT PAYROLL YEAR */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[13px] font-bold uppercase tracking-wider text-[#374151]">
+              1. Select Payroll Year
+            </label>
+            <span className="text-[12px] text-[#6B7280]">
+              {availableMonthsCount > 0 ? (
+                <span className="text-[#10B981] font-semibold">
+                  {availableMonthsCount} of 12 Months Available ({curYearData?.totalEmployees || 0} Employees)
+                </span>
+              ) : (
+                <span className="text-[#9CA3AF]">No imported records for this year</span>
+              )}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {availableYears.map((yr) => {
+              const yrSummary = centreSummary?.yearSummaries?.find((y: any) => y.year === yr);
+              const mCount = yrSummary?.totalMonthsWithRecords ?? 0;
+              const isSelected = selectedYear === yr && exportMode !== 'allYearsZip';
+
+              return (
+                <button
+                  key={yr}
+                  type="button"
+                  onClick={() => {
+                    setSelectedYear(yr);
+                    if (exportMode === 'allYearsZip') {
+                      setExportMode('fullYear');
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-[7px] text-[13px] font-semibold border transition-all flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-[#F47721] text-[#FFFFFF] border-[#F47721] shadow-xs'
+                      : 'bg-[#FFFFFF] text-[#374151] border-[#D1D5DB] hover:border-[#F47721] hover:text-[#F47721]'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{yr}</span>
+                  <span
+                    className={`text-[11px] px-1.5 py-0.2 rounded font-normal ${
+                      isSelected
+                        ? 'bg-[#FFFFFF]/25 text-[#FFFFFF]'
+                        : 'bg-[#F3F4F6] text-[#6B7280]'
+                    }`}
+                  >
+                    {mCount} mo
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. EXPORT TYPE */}
+        <div className="space-y-2">
+          <label className="text-[13px] font-bold uppercase tracking-wider text-[#374151]">
+            2. Export Type
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Mode A — Full Year */}
+            <button
+              type="button"
+              onClick={() => setExportMode('fullYear')}
+              className={`p-4 rounded-[8px] border text-left transition-all ${
+                exportMode === 'fullYear'
+                  ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
+                  : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-[14px] text-[#1F2937]">Full Year Export</span>
+                {exportMode === 'fullYear' && <CheckCircle2 className="w-4 h-4 text-[#F47721]" />}
+              </div>
+              <p className="text-[12px] text-[#6B7280]">
+                All available months in {selectedYear} exported into a single workbook with separate monthly worksheets plus an executive summary.
+              </p>
+            </button>
+
+            {/* Mode B — Selected Months */}
+            <button
+              type="button"
+              onClick={() => setExportMode('selectedMonths')}
+              className={`p-4 rounded-[8px] border text-left transition-all ${
+                exportMode === 'selectedMonths'
+                  ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
+                  : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-[14px] text-[#1F2937]">Selected Months Export</span>
+                {exportMode === 'selectedMonths' && <CheckCircle2 className="w-4 h-4 text-[#F47721]" />}
+              </div>
+              <p className="text-[12px] text-[#6B7280]">
+                Pick specific months within {selectedYear} to export. Non-imported months cannot be selected.
+              </p>
+            </button>
+
+            {/* Mode C — All Years ZIP */}
+            <button
+              type="button"
+              onClick={() => setExportMode('allYearsZip')}
+              className={`p-4 rounded-[8px] border text-left transition-all ${
+                exportMode === 'allYearsZip'
+                  ? 'border-[#F47721] bg-[#FFF8F3] ring-1 ring-[#F47721]'
+                  : 'border-[#E5E7EB] bg-[#FFFFFF] hover:border-[#D1D5DB]'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-[14px] text-[#1F2937]">All Years ZIP Archive</span>
+                {exportMode === 'allYearsZip' && <CheckCircle2 className="w-4 h-4 text-[#F47721]" />}
+              </div>
+              <p className="text-[12px] text-[#6B7280]">
+                Packages each year as a separate Excel workbook inside one ZIP. Never combines different years into one mixed sheet.
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* 3. DYNAMIC SELECTION BODY */}
+        <div className="space-y-3">
+          {/* Mode A: Full Year Preview */}
+          {exportMode === 'fullYear' && (
+            <div className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-[8px] p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[13px] text-[#1F2937]">
+                  3. Available Worksheets Included in Full Year {selectedYear}
+                </span>
+                <span className="text-[12px] text-[#6B7280]">
+                  {availableMonthsCount} worksheet(s) + 1 Executive Summary
+                </span>
+              </div>
+              {availableMonthsInYear.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <div className="px-3 py-1.5 rounded-[6px] bg-[#071747] text-[#FFFFFF] text-[12px] font-semibold flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Yearly Payroll Summary (Executive Sheet)</span>
+                  </div>
+                  {availableMonthsInYear.map((m: any) => (
+                    <div
+                      key={m.month}
+                      className="px-3 py-1.5 rounded-[6px] bg-[#FFFFFF] border border-[#D1D5DB] text-[12px] font-medium text-[#1F2937] flex items-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5 text-[#10B981]" />
+                      <span>{m.periodLabel}</span>
+                      <span className="text-[11px] text-[#6B7280]">({m.employeeCount} Emps)</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[13px] text-[#9CA3AF] py-2">
+                  No payroll records have been imported for {selectedYear} yet. Please import an Excel payroll file for this year first.
+                </div>
+              )}
+              <p className="text-[11.5px] text-[#6B7280] italic">
+                Note: Unimported months are automatically excluded so no empty ghost worksheets are created.
+              </p>
+            </div>
+          )}
+
+          {/* Mode B: Selected Months Grid */}
+          {exportMode === 'selectedMonths' && (
+            <div className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-[8px] p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-[13px] text-[#1F2937]">
+                  3. Select Months to Include for {selectedYear}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMonths(availableMonthsInYear.map((m: any) => m.month))}
+                    className="text-[12px] font-semibold text-[#F47721] hover:underline"
+                  >
+                    Select All Available Months
+                  </button>
+                  <span className="text-[#D1D5DB]">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMonths([])}
+                    className="text-[12px] font-semibold text-[#6B7280] hover:underline"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                {(curYearData?.months || []).map((m: any) => {
+                  const hasData = m.hasRecords;
+                  const isChecked = selectedMonths.includes(m.month);
+
+                  return (
+                    <div
+                      key={m.month}
+                      onClick={() => {
+                        if (!hasData) return;
+                        if (isChecked) {
+                          setSelectedMonths((prev) => prev.filter((id) => id !== m.month));
+                        } else {
+                          setSelectedMonths((prev) => [...prev, m.month]);
+                        }
+                      }}
+                      className={`p-2.5 rounded-[7px] border text-left transition-all ${
+                        !hasData
+                          ? 'bg-[#F3F4F6] border-[#E5E7EB] opacity-60 cursor-not-allowed'
+                          : isChecked
+                          ? 'bg-[#FFFFFF] border-[#F47721] shadow-xs cursor-pointer ring-1 ring-[#F47721]'
+                          : 'bg-[#FFFFFF] border-[#D1D5DB] hover:border-[#9CA3AF] cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <input
+                          type="checkbox"
+                          disabled={!hasData}
+                          checked={isChecked}
+                          onChange={() => {}} // handled by parent onClick
+                          className="rounded text-[#F47721] focus:ring-[#F47721]"
+                        />
+                        <span className="font-semibold text-[12.5px] text-[#1F2937]">
+                          {m.periodLabel.split(' ')[0]}
+                        </span>
+                      </div>
+                      <div className="text-[11px] pl-5">
+                        {hasData ? (
+                          <span className="text-[#10B981] font-medium">{m.employeeCount} Employees</span>
+                        ) : (
+                          <span className="text-[#9CA3AF]">Not imported</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Mode C: All Years ZIP Selection */}
+          {exportMode === 'allYearsZip' && (
+            <div className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-[8px] p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-[13px] text-[#1F2937]">
+                  3. Select Years to Package into All-Years ZIP Archive
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedZipYears(availableYears)}
+                    className="text-[12px] font-semibold text-[#F47721] hover:underline"
+                  >
+                    Select All Years
+                  </button>
+                  <span className="text-[#D1D5DB]">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedZipYears([])}
+                    className="text-[12px] font-semibold text-[#6B7280] hover:underline"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                {availableYears.map((yr) => {
+                  const yrSummary = centreSummary?.yearSummaries?.find((y: any) => y.year === yr);
+                  const mCount = yrSummary?.totalMonthsWithRecords ?? 0;
+                  const eCount = yrSummary?.totalEmployees ?? 0;
+                  const isChecked = selectedZipYears.includes(yr);
+
+                  return (
+                    <div
+                      key={yr}
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedZipYears((prev) => prev.filter((id) => id !== yr));
+                        } else {
+                          setSelectedZipYears((prev) => [...prev, yr]);
+                        }
+                      }}
+                      className={`p-3.5 rounded-[8px] border cursor-pointer transition-all ${
+                        isChecked
+                          ? 'bg-[#FFFFFF] border-[#F47721] ring-1 ring-[#F47721] shadow-xs'
+                          : 'bg-[#FFFFFF] border-[#D1D5DB] hover:border-[#9CA3AF]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-[15px] text-[#1F2937]">{yr}</span>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="rounded text-[#F47721] focus:ring-[#F47721]"
+                        />
+                      </div>
+                      <div className="text-[12px] text-[#6B7280] space-y-0.5">
+                        <div>{mCount} imported month(s)</div>
+                        <div>{eCount} employee records</div>
+                        <div className="text-[11px] font-mono text-[#F47721] pt-1">
+                          FINORA_Payroll_Archive_{yr}.xlsx
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-[12px] text-[#6B7280] italic">
+                Inside the ZIP archive, each selected year will be an independent Excel file containing only its own months and its own summary worksheet.
+              </p>
+            </div>
+          )}
+
+          {/* Comparison Checkbox */}
+          <div className="pt-1">
+            <label className="flex items-center gap-2.5 text-[13px] font-medium text-[#1F2937] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeOverridesComparison}
+                onChange={(e) => setIncludeOverridesComparison(e.target.checked)}
+                className="rounded text-[#F47721] focus:ring-[#F47721]"
+              />
+              <span>Include source-imported comparison columns alongside manual overrides</span>
+            </label>
+          </div>
+        </div>
+
+        {/* 4. EXPORT SUMMARY CARD */}
+        <div className="bg-[#FFFDF9] border border-[#FED7AA] rounded-[8px] p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#F47721]">
+              4. Export Summary
+            </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-[#1F2937]">
+              <span>
+                <strong>Target:</strong>{' '}
+                {exportMode === 'allYearsZip'
+                  ? `All Years Archive (${selectedZipYears.length} years)`
+                  : `${selectedYear} (${exportMode === 'fullYear' ? 'Full Year' : 'Selected Months'})`}
+              </span>
+              <span>
+                <strong>Months Included:</strong> {selectedMonthsCount}
+              </span>
+              <span>
+                <strong>Employees:</strong> {totalEmployeesForExport}
+              </span>
+              <span>
+                <strong>File Name:</strong>{' '}
+                <span className="font-mono text-[12px] text-[#1F2937] bg-[#FFFFFF] px-1.5 py-0.5 rounded border border-[#FED7AA]">
+                  {outputFileName}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* 5. DOWNLOAD ACTION BUTTON */}
+          <button
+            type="button"
+            disabled={!canDownload}
+            onClick={handleDownload}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-[7px] text-[13.5px] font-bold transition-all shadow-xs ${
+              canDownload
+                ? 'bg-[#F47721] text-[#FFFFFF] hover:bg-[#E06612] cursor-pointer'
+                : 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed'
+            }`}
+          >
+            <FileDown className="w-4 h-4" />
+            <span>
+              {exportMode === 'allYearsZip'
+                ? 'Download All Years ZIP Archive (.zip)'
+                : 'Download Excel Workbook (.xlsx)'}
+            </span>
+          </button>
+        </div>
       </div>
 
-      <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
-        <div className="px-4 py-3.5 border-b border-[#E5E7EB] font-semibold text-[15px] text-[#1F2937]">
-          Available Monthly Worksheets in Archive
+      {/* ARCHIVE WORKSHEETS TABLE */}
+      <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden space-y-0">
+        <div className="px-5 py-4 border-b border-[#E5E7EB] flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-[15px] text-[#1F2937]">Available Monthly Worksheets in Archive</h3>
+            <p className="text-[12px] text-[#6B7280]">
+              Verified historical payroll periods stored permanently in the database.
+            </p>
+          </div>
+
+          {/* Year Filter Tabs */}
+          <div className="flex items-center gap-1.5 bg-[#F3F4F6] p-1 rounded-[7px]">
+            <button
+              type="button"
+              onClick={() => setArchiveFilterYear('all')}
+              className={`px-3 py-1 rounded-[5px] text-[12px] font-semibold transition-all ${
+                archiveFilterYear === 'all'
+                  ? 'bg-[#FFFFFF] text-[#1F2937] shadow-xs'
+                  : 'text-[#6B7280] hover:text-[#1F2937]'
+              }`}
+            >
+              All Years
+            </button>
+            {availableYears.map((yr) => (
+              <button
+                key={yr}
+                type="button"
+                onClick={() => setArchiveFilterYear(yr)}
+                className={`px-3 py-1 rounded-[5px] text-[12px] font-semibold transition-all ${
+                  archiveFilterYear === yr
+                    ? 'bg-[#FFFFFF] text-[#F47721] shadow-xs'
+                    : 'text-[#6B7280] hover:text-[#1F2937]'
+                }`}
+              >
+                {yr}
+              </button>
+            ))}
+          </div>
         </div>
+
         <table className="w-full text-left border-collapse text-[13px]">
           <thead>
             <tr className="bg-[#F8F9FA] border-b border-[#E5E7EB] text-[#6B7280]">
-              <th className="py-3 px-4 font-semibold">Worksheet / Payroll Period</th>
+              <th className="py-3 px-5 font-semibold">Worksheet / Payroll Period</th>
               <th className="py-3 px-4 font-semibold">Imported Employees</th>
               <th className="py-3 px-4 font-semibold">PDFs Generated</th>
               <th className="py-3 px-4 font-semibold">Emails Sent</th>
-              <th className="py-3 px-4 text-right font-semibold">Total Net Payroll</th>
+              <th className="py-3 px-5 text-right font-semibold">Total Net Payroll</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E5E7EB]">
-            {(periodsData?.periods || []).map((p: any) => (
-              <tr key={p.id} className="hover:bg-[#F8F9FA]">
-                <td className="py-3 px-4 font-semibold text-[#1F2937]">{p.periodLabel}</td>
-                <td className="py-3 px-4">{p.employeeCount}</td>
-                <td className="py-3 px-4">{p.pdfGeneratedCount}</td>
-                <td className="py-3 px-4 font-semibold text-[#F47721]">{p.sentCount}</td>
-                <td className="py-3 px-4 text-right font-bold text-[#1F2937] tabular-nums">
-                  {formatIndianCurrency(p.totalNetPayroll, '₹')}
+            {filteredArchivePeriods.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-[#9CA3AF] text-[13px]">
+                  No payroll periods found for this year selection.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredArchivePeriods.map((p: any) => (
+                <tr key={p.id} className="hover:bg-[#F8F9FA]">
+                  <td className="py-3 px-5 font-semibold text-[#1F2937] flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-[#F47721]" />
+                    <span>{p.periodLabel}</span>
+                  </td>
+                  <td className="py-3 px-4">{p.employeeCount}</td>
+                  <td className="py-3 px-4">{p.pdfGeneratedCount}</td>
+                  <td className="py-3 px-4 font-semibold text-[#F47721]">{p.sentCount}</td>
+                  <td className="py-3 px-5 text-right font-bold text-[#1F2937] tabular-nums">
+                    {formatIndianCurrency(p.totalNetPayroll, '₹')}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
