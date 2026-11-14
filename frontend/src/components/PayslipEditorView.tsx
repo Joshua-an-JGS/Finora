@@ -5741,20 +5741,20 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     {!collapsedSections.visibility && (
                       <div className="p-4 border-t border-[#E5E7EB] space-y-3">
                         <p className="text-[12px] text-[#6B7280]">
-                          Document sections render in the standard corporate sequence below:
+                          Template layout configuration sections and their current active status:
                         </p>
                         <div className="space-y-1.5">
                           {[
                             {
-                              label: 'Header (Organization branding & contact)',
+                              label: '1. Company Header & Branding (Organization branding & contact)',
                               isActive: true,
                             },
                             {
-                              label: 'Payslip Main Heading (Title & payroll period banner)',
+                              label: '2. Payslip Main Heading (Document title & payroll period banner)',
                               isActive: true,
                             },
                             {
-                              label: 'Employee Details (Section heading & profile info)',
+                              label: '3. Employee Details Section (Section heading & profile info)',
                               isActive: Boolean(
                                 styleEdit?.showEmployeeDetailsHeading ||
                                 styleEdit?.showEmployeeId ||
@@ -5765,34 +5765,38 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                               ),
                             },
                             {
-                              label: 'Salary Tables (Earnings & Deductions tables)',
+                              label: '4. Page & Layout (Page margins & section spacing)',
                               isActive: true,
                             },
                             {
-                              label: 'Custom Fields (Additional payroll metadata)',
-                              isActive: Boolean(styleEdit?.showCustomTextFieldsSection),
+                              label: '5. Typography (Font family & font sizing)',
+                              isActive: true,
+                            },
+                            {
+                              label: '6. Color & Theme (Brand palette & document colors)',
+                              isActive: true,
+                            },
+                            {
+                              label: '7. Borders (Master, Row, Column & Sections)',
+                              isActive: Boolean(styleEdit?.enableBorders ?? true),
+                            },
+                            {
+                              label: '8. Tables (Widths, Column Splits, Padding & Zero Suppression)',
+                              isActive: true,
+                            },
+                            {
+                              label: '9. Authorized Signature Controls (Signatory authorization)',
+                              isActive: Boolean(styleEdit?.showSignatureArea),
+                            },
+                            {
+                              label: '10. Footer & Administrative Notes (System disclaimer & notes)',
+                              isActive: Boolean(styleEdit?.showFooterDisclaimer),
                             },
                             ...(styleEdit?.customTables || []).map((t, idx) => ({
                               label: `Custom Table ${idx + 1}: ${t.title || 'Untitled'} (${t.columns?.length || 0} cols, ${t.rows?.length || 0} rows)`,
                               isActive: t.isVisible !== false,
                               isCustom: true,
                             })),
-                            {
-                              label: 'Totals Summary (Gross Salary & Total Deductions bar)',
-                              isActive: true,
-                            },
-                            {
-                              label: 'Net Salary Banner (Highlighted net payable amount & words)',
-                              isActive: true,
-                            },
-                            {
-                              label: 'Signature Block (Signatory authorization)',
-                              isActive: Boolean(styleEdit?.showSignatureArea),
-                            },
-                            {
-                              label: 'Footer (Administrative notes & system disclaimer)',
-                              isActive: Boolean(styleEdit?.showFooterDisclaimer),
-                            },
                           ].map((item, i) => {
                             const isCustom = 'isCustom' in item && Boolean(item.isCustom);
                             return (
@@ -5804,8 +5808,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                                     : 'bg-[#F8F9FA] border-[#E5E7EB] text-[#1F2937]'
                                 }`}
                               >
-                                <span className={isCustom ? 'font-medium text-[#F47721]' : ''}>
-                                  {i + 1}. {item.label}
+                                <span className={isCustom ? 'font-medium text-[#F47721]' : 'font-medium text-[#1F2937]'}>
+                                  {item.label}
                                 </span>
                                 <span
                                   className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
@@ -5819,6 +5823,12 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                               </div>
                             );
                           })}
+                        </div>
+                        <div className="p-2.5 rounded-[6px] bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] text-[#6B7280] space-y-1">
+                          <span className="font-semibold text-[#1F2937] block">A4 Document Print Render Sequence:</span>
+                          <span className="block leading-relaxed">
+                            1. Header &rarr; 2. Payslip Main Heading &rarr; 3. Employee Details &rarr; 4. Salary Tables &rarr; 5. Custom Tables (if any) &rarr; 6. Custom Fields &rarr; 7. Totals Summary &rarr; 8. Net Salary Banner &rarr; 9. Signature Block &rarr; 10. Footer Notes
+                          </span>
                         </div>
                         <div className="pt-2 flex items-center justify-between border-t border-[#E5E7EB]">
                           <span className="text-[11.5px] text-[#6B7280]">
