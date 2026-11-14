@@ -205,7 +205,9 @@ public class AdminAndSettingsController : ControllerBase
         s.AuthorizedIdentifiers = req.AuthorizedIdentifiers?.Trim() ?? string.Empty;
         s.SignatoryName = req.SignatoryName?.Trim() ?? string.Empty;
         s.SignatoryDesignation = req.SignatoryDesignation?.Trim() ?? string.Empty;
-        s.LogoDataUrl = req.LogoDataUrl;
+        s.LogoDataUrl = !string.IsNullOrWhiteSpace(req.LogoDataUrl)
+            ? req.LogoDataUrl
+            : DatabaseInitializer.GetDefaultFinoraLogoDataUrl();
         s.CurrencySymbol = string.IsNullOrWhiteSpace(req.CurrencySymbol) ? "₹" : req.CurrencySymbol.Trim();
         s.CurrencyCode = string.IsNullOrWhiteSpace(req.CurrencyCode) ? "INR" : req.CurrencyCode.Trim();
         s.ShowZeroValueComponentsByDefault = req.ShowZeroValueComponentsByDefault;

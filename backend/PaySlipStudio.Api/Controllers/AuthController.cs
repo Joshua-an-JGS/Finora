@@ -207,6 +207,10 @@ public class AuthController : ControllerBase
             {
                 settings.CompanyName = req.CompanyName.Trim();
             }
+            if (string.IsNullOrWhiteSpace(settings.LogoDataUrl))
+            {
+                settings.LogoDataUrl = DatabaseInitializer.GetDefaultFinoraLogoDataUrl();
+            }
             settings.UpdatedAtUtc = DateTime.UtcNow;
             await _db.SaveChangesAsync();
 

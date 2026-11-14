@@ -215,28 +215,39 @@ export const CompanySetupWizard: React.FC<CompanySetupWizardProps> = ({
                 <label className="block text-[12px] font-semibold text-[#374151] mb-1">
                   Company Logo
                 </label>
-                <div className="flex items-center gap-4">
-                  {logoDataUrl ? (
-                    <div className="relative w-28 h-14 border border-[#E5E7EB] rounded-[6px] p-1 flex items-center justify-center bg-[#FAFAFA]">
-                      <img src={logoDataUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="relative w-28 h-14 border border-[#E5E7EB] rounded-[6px] p-1 flex items-center justify-center bg-[#FAFAFA]">
+                    <img
+                      src={logoDataUrl || '/finora_logo.png'}
+                      alt="Logo Preview"
+                      className="max-h-full max-w-full object-contain"
+                      onError={(e) => {
+                        e.currentTarget.src = '/finora_logo.png';
+                      }}
+                    />
+                    {logoDataUrl && (
                       <button
                         type="button"
                         onClick={() => setLogoDataUrl(null)}
+                        title="Reset to default FINORA logo"
                         className="absolute -top-2 -right-2 bg-[#DC2626] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-sm cursor-pointer"
                       >
                         &times;
                       </button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center gap-2 px-4 py-2 border border-[#D1D5DB] hover:border-[#F47721] rounded-[6px] text-[#4B5563] hover:text-[#F47721] cursor-pointer transition-colors bg-[#FAFAFA]">
-                      <Upload className="w-4 h-4" />
-                      <span>Upload Logo (PNG/JPG)</span>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#D1D5DB] hover:border-[#F47721] rounded-[6px] text-[12px] text-[#4B5563] hover:text-[#F47721] cursor-pointer transition-colors bg-[#FAFAFA]">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{logoDataUrl ? 'Change Custom Logo' : 'Upload Custom Logo (Optional)'}</span>
                       <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
                     </label>
-                  )}
-                  <span className="text-[11.5px] text-[#9CA3AF]">
-                    Displayed on official PDF payslips and fiscal exports.
-                  </span>
+                    <p className="text-[11.5px] text-[#9CA3AF]">
+                      {logoDataUrl
+                        ? 'Custom company logo uploaded.'
+                        : 'Default FINORA logo is active until a custom logo is uploaded.'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

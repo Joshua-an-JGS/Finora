@@ -100,31 +100,18 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
   }
   const renderLogoMark = () => {
     if (!cfg.showLogo) return null;
-    if (doc.logoDataUrl) {
-      return (
-        <img
-          src={doc.logoDataUrl}
-          alt={doc.companyName}
-          style={{ height: `${cfg.logoHeightPx || 44}px`, maxWidth: '160px', objectFit: 'contain' }}
-        />
-      );
-    }
+    const effectiveLogo = doc.logoDataUrl || '/finora_logo.png';
     return (
-      <div
-        className="flex items-center justify-center shrink-0 select-none"
-        style={{
-          width: '44px',
-          height: '44px',
-          borderRadius: '8px',
-          backgroundColor: orange,
-          color: '#FFFFFF',
-          fontWeight: 700,
-          fontSize: '14px',
-          letterSpacing: '0.04em',
+      <img
+        src={effectiveLogo}
+        alt={doc.companyName || 'FINORA'}
+        style={{ height: `${cfg.logoHeightPx || 44}px`, maxWidth: '160px', objectFit: 'contain' }}
+        onError={(e) => {
+          if (!e.currentTarget.src.endsWith('/finora_logo.png')) {
+            e.currentTarget.src = '/finora_logo.png';
+          }
         }}
-      >
-        {(doc.companyName || 'CORP').slice(0, 5)}
-      </div>
+      />
     );
   };
   // Section 16: Organization Header + Orange Divider Line

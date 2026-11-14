@@ -3145,8 +3145,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                           {(() => {
                             const headerActiveLogo =
                               styleEdit.overrideLogoDataUrl !== undefined && styleEdit.overrideLogoDataUrl !== null
-                                ? styleEdit.overrideLogoDataUrl
-                                : serverDoc?.logoDataUrl;
+                                ? (styleEdit.overrideLogoDataUrl || '/finora_logo.png')
+                                : (serverDoc?.logoDataUrl || '/finora_logo.png');
                             const isCustomLogo = Boolean(styleEdit.overrideLogoDataUrl);
 
                             return (
@@ -3159,11 +3159,15 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                                       <span className="px-2 py-0.5 text-[10.5px] font-semibold bg-[#FFF3E8] text-[#F47721] rounded-[4px] border border-[#F47721]/30">
                                         Custom Template Logo
                                       </span>
-                                    ) : headerActiveLogo ? (
+                                    ) : headerActiveLogo && headerActiveLogo !== '/finora_logo.png' ? (
                                       <span className="px-2 py-0.5 text-[10.5px] font-medium bg-[#FFFFFF] text-[#6B7280] rounded-[4px] border border-[#E5E7EB]">
-                                        Organization Default Logo
+                                        Organization Logo
                                       </span>
-                                    ) : null}
+                                    ) : (
+                                      <span className="px-2 py-0.5 text-[10.5px] font-semibold bg-[#FFF3E8] text-[#F47721] rounded-[4px] border border-[#F47721]/30">
+                                        Default FINORA Logo
+                                      </span>
+                                    )}
                                   </div>
                                   <label className="inline-flex items-center gap-1.5 cursor-pointer text-[12px] text-[#1F2937]">
                                     <input
@@ -3181,24 +3185,21 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
 
                                 <div className="flex flex-wrap items-center gap-4">
                                   {/* Current Logo Thumbnail */}
-                                  {headerActiveLogo ? (
-                                    <div
-                                      className={`h-14 min-w-[70px] max-w-[160px] p-1.5 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] flex items-center justify-center shadow-xs overflow-hidden ${
-                                        !styleEdit.showLogo ? 'opacity-40' : ''
-                                      }`}
-                                      title={styleEdit.showLogo ? 'Active Header Logo' : 'Logo is hidden'}
-                                    >
-                                      <img
-                                        src={headerActiveLogo}
-                                        alt="Company Logo"
-                                        className="max-h-full max-w-full object-contain"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div className="w-14 h-14 rounded-[8px] bg-[#F47721] flex items-center justify-center text-[#FFFFFF] font-bold text-[12px] shadow-xs">
-                                      {((styleEdit.overrideCompanyName || serverDoc?.companyName) || 'CORP').slice(0, 5)}
-                                    </div>
-                                  )}
+                                  <div
+                                    className={`h-14 min-w-[70px] max-w-[160px] p-1.5 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] flex items-center justify-center shadow-xs overflow-hidden ${
+                                      !styleEdit.showLogo ? 'opacity-40' : ''
+                                    }`}
+                                    title={styleEdit.showLogo ? 'Active Header Logo' : 'Logo is hidden'}
+                                  >
+                                    <img
+                                      src={headerActiveLogo}
+                                      alt="Company Logo"
+                                      className="max-h-full max-w-full object-contain"
+                                      onError={(e) => {
+                                        e.currentTarget.src = '/finora_logo.png';
+                                      }}
+                                    />
+                                  </div>
 
                                   {/* Upload and Logo Actions */}
                                   <div className="flex-1 min-w-[220px] space-y-2">

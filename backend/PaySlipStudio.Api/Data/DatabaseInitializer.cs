@@ -112,6 +112,7 @@ public static class DatabaseInitializer
         }
 
         // 3. Seed CompanySettings
+        var defaultLogo = GetDefaultFinoraLogoDataUrl(env);
         if (!await db.CompanySettings.AnyAsync())
         {
             db.CompanySettings.Add(new CompanySettings
@@ -137,9 +138,19 @@ public static class DatabaseInitializer
                 SmtpFromName = "FINORA Payroll Administration",
                 IsInitialized = false,
                 CompanySetupCompleted = false,
+                LogoDataUrl = defaultLogo,
                 UpdatedAtUtc = DateTime.UtcNow
             });
             await db.SaveChangesAsync();
+        }
+        else
+        {
+            var existingCompany = await db.CompanySettings.FirstOrDefaultAsync();
+            if (existingCompany != null && string.IsNullOrWhiteSpace(existingCompany.LogoDataUrl) && !string.IsNullOrWhiteSpace(defaultLogo))
+            {
+                existingCompany.LogoDataUrl = defaultLogo;
+                await db.SaveChangesAsync();
+            }
         }
 
         // 5. Seed Default Payslip Templates
@@ -473,6 +484,75 @@ Accounts & Finance Department
         }
 
         return cols;
+    }
+
+    private static byte[]? _cachedFinoraLogoBytes;
+    private static string? _cachedFinoraLogoDataUrl;
+    private static readonly object _logoLock = new();
+
+    public static byte[]? GetDefaultFinoraLogoBytes(IWebHostEnvironment? env = null)
+    {
+        if (_cachedFinoraLogoBytes != null) return _cachedFinoraLogoBytes;
+
+        lock (_logoLock)
+        {
+            if (_cachedFinoraLogoBytes != null) return _cachedFinoraLogoBytes;
+
+            try
+            {
+                var candidates = new List<string>();
+                if (env != null && !string.IsNullOrWhiteSpace(env.WebRootPath))
+                {
+                    candidates.Add(Path.Combine(env.WebRootPath, "finora_logo.png"));
+                }
+                if (env != null && !string.IsNullOrWhiteSpace(env.ContentRootPath))
+                {
+                    candidates.Add(Path.Combine(env.ContentRootPath, "wwwroot", "finora_logo.png"));
+                    candidates.Add(Path.Combine(env.ContentRootPath, "finora_logo.png"));
+                }
+
+                candidates.Add(Path.Combine(AppContext.BaseDirectory, "wwwroot", "finora_logo.png"));
+                candidates.Add(Path.Combine(AppContext.BaseDirectory, "finora_logo.png"));
+
+                var current = new DirectoryInfo(Directory.GetCurrentDirectory());
+                for (int i = 0; i < 5 && current != null; i++)
+                {
+                    candidates.Add(Path.Combine(current.FullName, "backend", "PaySlipStudio.Api", "wwwroot", "finora_logo.png"));
+                    candidates.Add(Path.Combine(current.FullName, "frontend", "public", "finora_logo.png"));
+                    candidates.Add(Path.Combine(current.FullName, "frontend", "dist", "finora_logo.png"));
+                    candidates.Add(Path.Combine(current.FullName, "wwwroot", "finora_logo.png"));
+                    candidates.Add(Path.Combine(current.FullName, "logo", "finora_logo.png"));
+                    current = current.Parent;
+                }
+
+                foreach (var path in candidates)
+                {
+                    if (File.Exists(path))
+                    {
+                        var bytes = File.ReadAllBytes(path);
+                        if (bytes.Length > 0)
+                        {
+                            _cachedFinoraLogoBytes = bytes;
+                            _cachedFinoraLogoDataUrl = $"data:image/png;base64,{Convert.ToBase64String(bytes)}";
+                            return _cachedFinoraLogoBytes;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback gracefully if logo file cannot be read
+            }
+
+            return null;
+        }
+    }
+
+    public static string? GetDefaultFinoraLogoDataUrl(IWebHostEnvironment? env = null)
+    {
+        if (_cachedFinoraLogoDataUrl != null) return _cachedFinoraLogoDataUrl;
+        GetDefaultFinoraLogoBytes(env);
+        return _cachedFinoraLogoDataUrl;
     }
 }
 

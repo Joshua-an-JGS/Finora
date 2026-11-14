@@ -328,7 +328,7 @@ public class PdfRenderingService
                         {
                             leftRow.ConstantItem(56).AlignTop().Column(logoCol =>
                             {
-                                var logoBytes = TryDecodeDataUrlImage(model.LogoDataUrl);
+                                var logoBytes = TryDecodeDataUrlImage(model.LogoDataUrl) ?? DatabaseInitializer.GetDefaultFinoraLogoBytes();
                                 if (logoBytes != null)
                                 {
                                     logoCol.Item().MaxHeight(cfg.LogoHeightPx).Image(logoBytes).FitArea();
@@ -421,7 +421,7 @@ public class PdfRenderingService
                     {
                         row.ConstantItem(64).AlignMiddle().Column(logoCol =>
                         {
-                            var logoBytes = TryDecodeDataUrlImage(model.LogoDataUrl);
+                            var logoBytes = TryDecodeDataUrlImage(model.LogoDataUrl) ?? DatabaseInitializer.GetDefaultFinoraLogoBytes();
                             if (logoBytes != null)
                             {
                                 logoCol.Item().MaxHeight(cfg.LogoHeightPx).Image(logoBytes).FitArea();

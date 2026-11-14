@@ -4030,37 +4030,43 @@ export const SettingsView: React.FC<{
 
         {/* Company Logo Upload */}
         <div className="flex flex-wrap items-center gap-4 pb-2">
-          {form.logoDataUrl ? (
+          <div className="h-14 w-auto min-w-[56px] max-w-[160px] p-1 rounded-[7px] border border-[#E5E7EB] bg-[#FFFFFF] flex items-center justify-center shadow-xs">
             <img
-              src={form.logoDataUrl}
+              src={form.logoDataUrl || '/finora_logo.png'}
               alt="Company Logo"
-              className="h-12 w-auto object-contain rounded-[7px] border border-[#E5E7EB] p-1"
+              className="max-h-full max-w-full object-contain"
+              onError={(e) => {
+                e.currentTarget.src = '/finora_logo.png';
+              }}
             />
-          ) : (
-            <div className="w-12 h-12 rounded-[8px] bg-[#F47721] flex items-center justify-center text-[#FFFFFF] font-bold text-[12px]">
-              {(form.companyName || 'CORP').slice(0, 5)}
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] bg-[#FFF3E8] text-[#F47721] font-semibold text-[12px] cursor-pointer hover:bg-[#F47721] hover:text-[#FFFFFF] transition-colors shadow-xs">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Custom Logo</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleLogoFileChange}
+                />
+              </label>
+              {form.logoDataUrl && (
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, logoDataUrl: null })}
+                  className="px-2.5 py-1.5 text-[12px] text-[#6B7280] hover:text-[#DC2626] border border-[#E5E7EB] rounded-[6px] hover:border-[#FECACA] hover:bg-[#FEF2F2] transition-colors"
+                >
+                  Reset to Default FINORA Logo
+                </button>
+              )}
             </div>
-          )}
-          <div className="space-y-1">
-            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] bg-[#FFF3E8] text-[#F47721] font-semibold text-[12px] cursor-pointer hover:bg-[#F47721] hover:text-[#FFFFFF] transition-colors">
-              <Upload className="w-3.5 h-3.5" />
-              <span>Upload Company Logo</span>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={handleLogoFileChange}
-              />
-            </label>
-            {form.logoDataUrl && (
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, logoDataUrl: null })}
-                className="ml-2 text-[12px] text-[#6B7280] hover:text-[#1F2937]"
-              >
-                Remove Logo
-              </button>
-            )}
+            <p className="text-[11.5px] text-[#6B7280]">
+              {form.logoDataUrl
+                ? 'Custom company logo active for all payslip prints and PDF generations.'
+                : 'Using default FINORA brand logo until a custom logo is uploaded.'}
+            </p>
           </div>
         </div>
 

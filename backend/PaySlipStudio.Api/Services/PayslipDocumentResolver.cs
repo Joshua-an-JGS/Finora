@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using PaySlipStudio.Api.Data;
 using PaySlipStudio.Api.Models;
 
 namespace PaySlipStudio.Api.Services;
@@ -51,7 +52,9 @@ public class PayslipDocumentResolver
             AuthorizedIdentifiers = companySettings.AuthorizedIdentifiers,
             LogoDataUrl = styleConfig.OverrideLogoDataUrl != null
                 ? (string.IsNullOrWhiteSpace(styleConfig.OverrideLogoDataUrl) ? null : styleConfig.OverrideLogoDataUrl)
-                : companySettings.LogoDataUrl,
+                : (!string.IsNullOrWhiteSpace(companySettings.LogoDataUrl)
+                    ? companySettings.LogoDataUrl
+                    : DatabaseInitializer.GetDefaultFinoraLogoDataUrl()),
             CurrencySymbol = string.IsNullOrWhiteSpace(companySettings.CurrencySymbol) ? "₹" : companySettings.CurrencySymbol,
             CurrencyCode = string.IsNullOrWhiteSpace(companySettings.CurrencyCode) ? "INR" : companySettings.CurrencyCode,
 
