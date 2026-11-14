@@ -4318,7 +4318,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <Sliders className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          2. Page &amp; Layout
+                          4. Page &amp; Layout
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -4451,7 +4451,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 3. Typography */}
+                  {/* 5. Typography */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -4461,7 +4461,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <FileText className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          3. Typography
+                          5. Typography
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -4566,7 +4566,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 4. Color & Theme */}
+                  {/* 6. Color & Theme */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -4576,7 +4576,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <Sliders className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          4. Color &amp; Theme
+                          6. Color &amp; Theme
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -4876,7 +4876,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 5. Borders */}
+                  {/* 7. Borders */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -4886,7 +4886,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <Layout className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          5. Borders (Master, Row, Column &amp; Sections)
+                          7. Borders (Master, Row, Column &amp; Sections)
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -5165,7 +5165,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 6. Tables */}
+                  {/* 8. Tables */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -5175,7 +5175,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <Layout className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          6. Tables (Widths, Column Splits, Padding &amp; Zero Suppression)
+                          8. Tables (Widths, Column Splits, Padding &amp; Zero Suppression)
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -5411,7 +5411,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 7. Signature Area */}
+                  {/* 9. Signature Area */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -5421,7 +5421,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <Edit3 className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          7. Authorized Signature Controls
+                          9. Authorized Signature Controls
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -5655,7 +5655,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 8. Footer & Notes */}
+                  {/* 10. Footer & Notes */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -5665,7 +5665,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <StickyNote className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          8. Footer &amp; Administrative Notes
+                          10. Footer &amp; Administrative Notes
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -5755,7 +5755,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                     )}
                   </div>
 
-                  {/* 9. Visibility & Section Ordering */}
+                  {/* 11. Visibility & Section Ordering */}
                   <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[10px] overflow-hidden">
                     <button
                       type="button"
@@ -5765,7 +5765,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                       <div className="flex items-center gap-2.5">
                         <Eye className="w-4 h-4 text-[#F47721]" />
                         <span className="text-[14.5px] font-semibold text-[#1F2937]">
-                          9. Section Visibility &amp; Ordering
+                          11. Section Visibility &amp; Ordering
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -5787,21 +5787,56 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                         </p>
                         <div className="space-y-1.5">
                           {[
-                            '1. Header (Organization branding & contact)',
-                            '2. TitleBanner (Document title & payroll period)',
-                            '3. EmployeeDetails (Code, Name, Department, Designation, Joining date)',
-                            '4. SalaryTables (Earnings & Deductions tables)',
-                            '5. CustomFields (Additional payroll metadata)',
-                            ...(styleEdit?.customTables || []).map(
-                              (t, idx) =>
-                                `Custom Table ${idx + 1}: ${t.title || 'Untitled'} (${t.columns?.length || 0} cols, ${t.rows?.length || 0} rows)`
-                            ),
-                            '6. TotalsSummary (Gross Salary & Total Deductions bar)',
-                            '7. NetSalaryBanner (Highlighted net payable amount & words)',
-                            '8. SignatureBlock (Signatory authorization)',
-                            '9. Footer (Administrative notes & system disclaimer)',
-                          ].map((sec, i) => {
-                            const isCustom = sec.startsWith('Custom Table');
+                            {
+                              label: 'Header (Organization branding & contact)',
+                              isActive: true,
+                            },
+                            {
+                              label: 'Payslip Main Heading (Title & payroll period banner)',
+                              isActive: true,
+                            },
+                            {
+                              label: 'Employee Details (Section heading & profile info)',
+                              isActive: Boolean(
+                                styleEdit?.showEmployeeDetailsHeading ||
+                                styleEdit?.showEmployeeId ||
+                                styleEdit?.showEmployeeName ||
+                                styleEdit?.showDepartment ||
+                                styleEdit?.showDesignation ||
+                                styleEdit?.showPayrollPeriodInDetails
+                              ),
+                            },
+                            {
+                              label: 'Salary Tables (Earnings & Deductions tables)',
+                              isActive: true,
+                            },
+                            {
+                              label: 'Custom Fields (Additional payroll metadata)',
+                              isActive: Boolean(styleEdit?.showCustomTextFieldsSection),
+                            },
+                            ...(styleEdit?.customTables || []).map((t, idx) => ({
+                              label: `Custom Table ${idx + 1}: ${t.title || 'Untitled'} (${t.columns?.length || 0} cols, ${t.rows?.length || 0} rows)`,
+                              isActive: t.isVisible !== false,
+                              isCustom: true,
+                            })),
+                            {
+                              label: 'Totals Summary (Gross Salary & Total Deductions bar)',
+                              isActive: true,
+                            },
+                            {
+                              label: 'Net Salary Banner (Highlighted net payable amount & words)',
+                              isActive: true,
+                            },
+                            {
+                              label: 'Signature Block (Signatory authorization)',
+                              isActive: Boolean(styleEdit?.showSignatureArea),
+                            },
+                            {
+                              label: 'Footer (Administrative notes & system disclaimer)',
+                              isActive: Boolean(styleEdit?.showFooterDisclaimer),
+                            },
+                          ].map((item, i) => {
+                            const isCustom = 'isCustom' in item && Boolean(item.isCustom);
                             return (
                               <div
                                 key={i}
@@ -5811,8 +5846,18 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                                     : 'bg-[#F8F9FA] border-[#E5E7EB] text-[#1F2937]'
                                 }`}
                               >
-                                <span className={isCustom ? 'font-medium text-[#F47721]' : ''}>{sec}</span>
-                                <span className="text-[11px] font-medium text-[#F47721]">Active</span>
+                                <span className={isCustom ? 'font-medium text-[#F47721]' : ''}>
+                                  {i + 1}. {item.label}
+                                </span>
+                                <span
+                                  className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
+                                    item.isActive
+                                      ? 'text-[#065F46] bg-[#ECFDF5] border-[#A7F3D0]'
+                                      : 'text-[#6B7280] bg-[#F3F4F6] border-[#E5E7EB]'
+                                  }`}
+                                >
+                                  {item.isActive ? 'Active' : 'Disabled'}
+                                </span>
                               </div>
                             );
                           })}
