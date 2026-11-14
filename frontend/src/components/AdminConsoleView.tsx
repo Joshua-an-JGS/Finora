@@ -71,10 +71,10 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
     serverUptime: string;
     dbConnected: boolean;
   }>({
-    totalUsers: 3,
-    activeUsers: 3,
+    totalUsers: 1,
+    activeUsers: 1,
     totalAuditEvents: 0,
-    activePeriod: 'October 2026',
+    activePeriod: 'March 2028',
     serverUptime: 'Operational',
     dbConnected: true,
   });
@@ -153,14 +153,14 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
   const loadConsoleData = async () => {
     try {
       const [usersRes, auditRes, compRes, healthRes] = await Promise.allSettled([
-        apiRequest<any[]>('/api/admin/users'),
+        apiRequest<any[]>('/api/users'),
         apiRequest<any>('/api/audit'),
         apiRequest<any>('/api/settings/company'),
         apiRequest<any>('/api/health'),
       ]);
 
-      let totalUsers = 3;
-      let activeUsers = 3;
+      let totalUsers = 1;
+      let activeUsers = 1;
       if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) {
         totalUsers = usersRes.value.length;
         activeUsers = usersRes.value.filter((u: any) => u.isActive !== false).length;
@@ -513,7 +513,11 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
             {/* 2. USERS */}
             {activeNav === 'users' && (
               <div className="space-y-4">
-                <UserManagementView currentUser={currentUser} isAdmin={true} />
+                <UserManagementView
+                  currentUser={currentUser}
+                  isAdmin={true}
+                  onUserCountChanged={loadConsoleData}
+                />
               </div>
             )}
 

@@ -365,6 +365,7 @@ public class AdminAndSettingsController : ControllerBase
     // USER & ROLE MANAGEMENT (Section 4)
     // ========================================================================
     [HttpGet("users")]
+    [HttpGet("admin/users")]
     [Authorize(Roles = AppRoles.Administrator)]
     public async Task<IActionResult> GetUsers()
     {

@@ -1672,7 +1672,8 @@ export const ReportsAndExportsView: React.FC<{
 export const UserManagementView: React.FC<{
   currentUser?: UserProfile | null;
   isAdmin?: boolean;
-}> = ({ currentUser, isAdmin = true }) => {
+  onUserCountChanged?: (count: number) => void;
+}> = ({ currentUser, isAdmin = true, onUserCountChanged }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1737,7 +1738,9 @@ export const UserManagementView: React.FC<{
     setLoading(true);
     apiRequest<any[]>('/api/users')
       .then((res) => {
-        setUsers(res || []);
+        const list = res || [];
+        setUsers(list);
+        onUserCountChanged?.(list.length);
       })
       .catch((err: any) => {
         setFeedback({ type: 'error', message: err.message || 'Failed to load user accounts.' });
@@ -2007,20 +2010,20 @@ export const UserManagementView: React.FC<{
     switch (roleName) {
       case 'Administrator':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[5px] text-[11.5px] font-semibold bg-[#FFF3E8] text-[#F47721] border border-[#FED7AA]">
-            <Shield className="w-3 h-3 text-[#F47721]" />
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#F47721]">
+            <Shield className="w-3.5 h-3.5 text-[#F47721]" />
             Administrator
           </span>
         );
       case 'AccountsOperator':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[5px] text-[11.5px] font-medium bg-[#F3F4F6] text-[#374151] border border-[#E5E7EB]">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#374151]">
             Accounts Operator
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[5px] text-[11.5px] font-medium bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0]">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#64748B]">
             Viewer
           </span>
         );
@@ -2204,12 +2207,12 @@ export const UserManagementView: React.FC<{
                     {/* Status */}
                     <td className="py-3.5 px-4">
                       {u.isActive ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
+                        <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#16A34A]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB]">
+                        <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#9CA3AF]">
                           <span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]"></span>
                           Inactive
                         </span>
