@@ -523,17 +523,18 @@ export const App: React.FC = () => {
   const activeMonthLabel = MONTHS.find((m) => m.value === activeMonth)?.label || 'October';
 
   return (
-    <div className="min-h-screen flex bg-[#F8F9FA] text-[#1F2937]">
+    <div className="h-screen w-screen overflow-hidden flex bg-[#F8F9FA] text-[#1F2937]">
       {/* ====================================================================
           SECTION 5: LEFT SIDEBAR (232px, White #FFFFFF, Right Border #E5E7EB)
       ==================================================================== */}
       <aside
-        className={`no-print bg-[#FFFFFF] border-r border-[#E5E7EB] flex flex-col justify-between transition-all duration-200 shrink-0 select-none ${sidebarCollapsed ? 'w-[68px]' : 'w-[232px]'
-          }`}
+        className={`no-print h-screen sticky top-0 bg-[#FFFFFF] border-r border-[#E5E7EB] flex flex-col justify-between transition-all duration-200 shrink-0 select-none overflow-hidden z-30 ${
+          sidebarCollapsed ? 'w-[68px]' : 'w-[232px]'
+        }`}
       >
-        {/* Top Branding */}
-        <div>
-          <div className="h-[64px] px-4 flex items-center justify-between border-b border-[#E5E7EB]">
+        {/* Top Branding & Navigation */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="h-[64px] px-4 flex items-center justify-between border-b border-[#E5E7EB] shrink-0">
             <div className="flex items-center gap-2 overflow-hidden">
               <img
                 src="/finora_logo.png"
@@ -565,8 +566,8 @@ export const App: React.FC = () => {
             </button>
           </div>
 
-          {/* Navigation Menu */}
-          <nav className="py-3 px-2.5 space-y-0.5">
+          {/* Navigation Menu (Internally scrollable if viewport height is small) */}
+          <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5 min-h-0">
             {navItems
               .filter((item) => item.visible)
               .map((item) => {
@@ -577,10 +578,11 @@ export const App: React.FC = () => {
                     type="button"
                     onClick={() => setActiveNav(item.key)}
                     title={sidebarCollapsed ? item.label : undefined}
-                    className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-[7px] text-[13px] transition-colors ${active
+                    className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-[7px] text-[13px] transition-colors ${
+                      active
                         ? 'bg-[#FFF3E8] text-[#F47721] font-semibold'
                         : 'text-[#6B7280] hover:bg-[#FFF8F3] hover:text-[#1F2937] font-medium'
-                      }`}
+                    }`}
                   >
                     {/* Small orange indicator bar on the left for active item */}
                     {active && (
@@ -597,7 +599,7 @@ export const App: React.FC = () => {
         </div>
 
         {/* Bottom Payroll Period Selector Card & Developer Attribution */}
-        <div className="p-3 border-t border-[#E5E7EB] space-y-2.5">
+        <div className="p-3 border-t border-[#E5E7EB] space-y-2.5 shrink-0 bg-[#FFFFFF]">
           {!sidebarCollapsed ? (
             <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[8px] p-2.5">
               <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#6B7280] mb-1.5">
@@ -665,7 +667,7 @@ export const App: React.FC = () => {
       {/* ====================================================================
           MAIN CONTENT AREA (Top Header + Application Workspace)
       ==================================================================== */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* SECTION 6: TOP HEADER (White #FFFFFF, 64px height, Bottom Border #E5E7EB) */}
         <header className="no-print h-[64px] bg-[#FFFFFF] border-b border-[#E5E7EB] px-6 flex items-center justify-between gap-4 shrink-0 z-20">
           {/* Left: Global Employee Search */}

@@ -223,7 +223,7 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-[#1F2937]">
+    <div className="h-screen w-screen overflow-hidden flex flex-col bg-[#F8F9FA] text-[#1F2937]">
       {/* ====================================================================
           ADMINISTRATION TOP BAR
       ==================================================================== */}
@@ -303,7 +303,7 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
       {/* ====================================================================
           ADMIN BODY: SIDEBAR + CONTENT
       ==================================================================== */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Admin Navigation Sidebar (240px) */}
         <aside className="w-[240px] bg-[#FFFFFF] border-r border-[#E5E7EB] flex flex-col justify-between shrink-0 select-none overflow-hidden">
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
