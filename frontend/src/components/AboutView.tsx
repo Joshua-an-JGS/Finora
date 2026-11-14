@@ -160,6 +160,20 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
           });
           return;
         }
+        if (res?.updateInfo?.version) {
+          const latest = res.updateInfo.version;
+          const current = (electronAPI.getAppVersion && electronAPI.getAppVersion()) || updateStatus?.currentVersion || '1.0.3';
+          if (latest !== current) {
+            setCheckResult({
+              message: `A new update is available: v${latest}!`,
+              isError: false,
+              isUpdateAvailable: true,
+              latestVersion: latest,
+              releaseNotes: typeof res.updateInfo.releaseNotes === 'string' ? res.updateInfo.releaseNotes : undefined,
+            });
+            return;
+          }
+        }
       }
 
       // Check via backend API

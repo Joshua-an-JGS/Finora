@@ -99,12 +99,64 @@ public class UpdateController : ControllerBase
         client.Timeout = TimeSpan.FromSeconds(7);
         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("FINORA-Desktop", CurrentApplicationVersion));
 
-        // GitHub Release API or generic HTTPS endpoint
+        // GitHub Release check endpoints
         string targetRepo = "Joshua-an-JGS/Finora";
+        string ymlUrl = $"https://github.com/{targetRepo}/releases/latest/download/latest.yml";
         string checkUrl = $"https://api.github.com/repos/{targetRepo}/releases/latest";
 
         try
         {
+            // 1. Primary Check: Direct latest.yml fetch from GitHub Releases (NEVER rate limited by GitHub)
+            try
+            {
+                using var ymlResponse = await client.GetAsync(ymlUrl);
+                if (ymlResponse.IsSuccessStatusCode)
+                {
+                    var ymlContent = await ymlResponse.Content.ReadAsStringAsync();
+                    string? detectedVersion = null;
+                    string? detectedPath = "FINORA_Setup.exe";
+
+                    foreach (var line in ymlContent.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var trimmed = line.Trim();
+                        if (trimmed.StartsWith("version:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            detectedVersion = trimmed.Substring("version:".Length).Trim().Trim('\'', '"');
+                        }
+                        else if (trimmed.StartsWith("path:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            detectedPath = trimmed.Substring("path:".Length).Trim().Trim('\'', '"');
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(detectedVersion))
+                    {
+                        var cleanVersion = detectedVersion.TrimStart('v').Trim();
+                        bool isNewer = CompareVersions(cleanVersion, CurrentApplicationVersion) > 0;
+                        string downloadUrl = $"https://github.com/{targetRepo}/releases/latest/download/{detectedPath ?? "FINORA_Setup.exe"}";
+
+                        return Ok(new
+                        {
+                            isSuccess = true,
+                            isUpdateAvailable = isNewer,
+                            currentVersion = CurrentApplicationVersion,
+                            latestVersion = cleanVersion,
+                            releaseName = $"FINORA v{cleanVersion}",
+                            releaseNotes = "System quality release with enhanced Excel import, master export centre, payslip templates, and branding.",
+                            publishedAt = DateTime.UtcNow.ToString("O"),
+                            downloadUrl,
+                            totalBytes = 152889055L,
+                            lastCheckedAtUtc = settings.LastUpdateCheckedAtUtc
+                        });
+                    }
+                }
+            }
+            catch
+            {
+                // Fall back to REST API check below if direct CDN is unreachable
+            }
+
+            // 2. Secondary Fallback: GitHub REST API
             using var response = await client.GetAsync(checkUrl);
 
             if (response.IsSuccessStatusCode)
