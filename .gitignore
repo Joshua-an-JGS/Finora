@@ -52,3 +52,5 @@ test_*.pdf
 0.26.0
 0.30.0
 test_font.cs
+
+dist_release/
