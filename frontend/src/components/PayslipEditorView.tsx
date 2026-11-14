@@ -4590,8 +4590,9 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                             />
                           </div>
                         </div>
+                      </div>
 
-                        {/* Zero Value Rows Rule */}
+                      {/* Zero Value Rows Rule */}
                         <div className="pt-3 border-t border-[#E5E7EB] p-3 rounded-[8px] bg-[#FFF8F3] border border-[#F47721]/30">
                           <label className="flex items-start gap-2.5 cursor-pointer">
                             <input

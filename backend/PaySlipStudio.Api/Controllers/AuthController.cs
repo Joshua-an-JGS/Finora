@@ -383,12 +383,35 @@ public class AuthController : ControllerBase
             }
 
             var identifier = req.AdministratorId.Trim();
+            var identifierUpper = identifier.ToUpper();
+            var identifierLower = identifier.ToLower();
+
             var user = await _userManager.FindByEmailAsync(identifier)
                        ?? await _userManager.FindByNameAsync(identifier)
                        ?? await _db.Users.FirstOrDefaultAsync(u =>
-                           u.NormalizedUserName == identifier.ToUpper() ||
-                           u.NormalizedEmail == identifier.ToUpper() ||
-                           (u.FullName != null && u.FullName.ToLower() == identifier.ToLower()));
+                           u.NormalizedUserName == identifierUpper ||
+                           u.NormalizedEmail == identifierUpper ||
+                           (u.FullName != null && (u.FullName.ToLower() == identifierLower || EF.Functions.Like(u.FullName, identifier))));
+
+            if (user == null)
+            {
+                var adminUsers = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+                if (adminUsers.Count == 1)
+                {
+                    var singleAdmin = adminUsers[0];
+                    var fn = (singleAdmin.FullName ?? string.Empty).ToLower();
+                    var un = (singleAdmin.UserName ?? string.Empty).ToLower();
+                    var em = (singleAdmin.Email ?? string.Empty).ToLower();
+
+                    if (fn.Contains(identifierLower) || identifierLower.Contains(fn) ||
+                        un.Contains(identifierLower) || identifierLower.Contains(un) ||
+                        em.Contains(identifierLower) || identifierLower.Contains(em) ||
+                        identifierLower == "admin" || identifierLower == "administrator")
+                    {
+                        user = singleAdmin;
+                    }
+                }
+            }
 
             // Constant-time mitigation delay (350ms) to resist timing attacks
             await Task.Delay(350);
@@ -413,6 +436,10 @@ public class AuthController : ControllerBase
 
             var passwordAttempt = req.Password?.Trim() ?? string.Empty;
             var result = await _signInManager.CheckPasswordSignInAsync(user, passwordAttempt, lockoutOnFailure: false);
+            if (!result.Succeeded && req.Password != null && req.Password != passwordAttempt)
+            {
+                result = await _signInManager.CheckPasswordSignInAsync(user, req.Password, lockoutOnFailure: false);
+            }
 
             if (result.IsLockedOut)
             {
@@ -517,15 +544,47 @@ public class AuthController : ControllerBase
         }
 
         var identifier = req.UsernameOrEmail.Trim();
+        var identifierUpper = identifier.ToUpper();
+        var identifierLower = identifier.ToLower();
+
         var user = await _userManager.FindByEmailAsync(identifier)
-                   ?? await _userManager.FindByNameAsync(identifier);
+                   ?? await _userManager.FindByNameAsync(identifier)
+                   ?? await _db.Users.FirstOrDefaultAsync(u =>
+                       u.NormalizedUserName == identifierUpper ||
+                       u.NormalizedEmail == identifierUpper ||
+                       (u.FullName != null && (u.FullName.ToLower() == identifierLower || EF.Functions.Like(u.FullName, identifier))));
+
+        if (user == null)
+        {
+            var adminUsers = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
+            if (adminUsers.Count == 1)
+            {
+                var singleAdmin = adminUsers[0];
+                var fn = (singleAdmin.FullName ?? string.Empty).ToLower();
+                var un = (singleAdmin.UserName ?? string.Empty).ToLower();
+                var em = (singleAdmin.Email ?? string.Empty).ToLower();
+
+                if (fn.Contains(identifierLower) || identifierLower.Contains(fn) ||
+                    un.Contains(identifierLower) || identifierLower.Contains(un) ||
+                    em.Contains(identifierLower) || identifierLower.Contains(em) ||
+                    identifierLower == "admin" || identifierLower == "administrator")
+                {
+                    user = singleAdmin;
+                }
+            }
+        }
 
         if (user == null || !user.IsActive)
         {
             return Unauthorized(new { message = "Invalid credentials or inactive account." });
         }
 
-        var result = await _signInManager.CheckPasswordSignInAsync(user, req.Password, lockoutOnFailure: false);
+        var passwordAttempt = req.Password?.Trim() ?? string.Empty;
+        var result = await _signInManager.CheckPasswordSignInAsync(user, passwordAttempt, lockoutOnFailure: false);
+        if (!result.Succeeded && req.Password != null && req.Password != passwordAttempt)
+        {
+            result = await _signInManager.CheckPasswordSignInAsync(user, req.Password, lockoutOnFailure: false);
+        }
 
 
         if (result.IsLockedOut)

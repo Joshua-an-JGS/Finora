@@ -54,3 +54,4 @@ test_*.pdf
 test_font.cs
 
 dist_release/
+build_out/

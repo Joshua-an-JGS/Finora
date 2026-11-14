@@ -157,7 +157,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ initialMode = 'normal', on
       setStoredSession(res.token, res.user);
       onLoginSuccess(res.user);
     } catch (err: any) {
-      setError(err.message || 'Sign-in failed. Please verify your credentials.');
+      const msg = err?.message || '';
+      if (msg.includes('500') || msg.toLowerCase().includes('failed (500)')) {
+        setError('Invalid credentials or sign-in rejected.');
+      } else {
+        setError(msg || 'Sign-in failed. Please verify your credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -187,8 +192,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ initialMode = 'normal', on
       setStoredSession(res.token, { ...res.user, isAdminSession: true });
       onLoginSuccess({ ...res.user, isAdminSession: true });
     } catch (err: any) {
-      // Never enumerate: show generic error
-      setError(err.message || 'Invalid administrator credentials.');
+      const msg = err?.message || '';
+      if (msg.includes('500') || msg.toLowerCase().includes('failed (500)')) {
+        setError('Invalid administrator credentials or access denied.');
+      } else {
+        setError(msg || 'Invalid administrator credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -280,7 +289,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ initialMode = 'normal', on
         }
       } else {
         setIsFirstRunSetup(false);
-        setInfoMessage('Administrator account created successfully! Please sign in with your credentials to begin.');
+        setInfoMessage(null);
       }
     } catch (err: any) {
       setError(err.message || 'Workspace initialization failed.');
@@ -414,8 +423,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ initialMode = 'normal', on
                       setIsFirstRunSetup(false);
                       setIsAdminGateway(true);
                       setAdminId(setupUsername.trim());
+                      setInfoMessage(null);
                       if (onSetupCompleted) onSetupCompleted();
-                      setInfoMessage('Administrator account created! Please authenticate via the Administrator Gateway.');
                     }}
                     className="w-full py-2.5 px-4 rounded-[7px] bg-[#FFF3E8] border border-[#F47721]/30 hover:border-[#F47721] text-[#F47721] font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors cursor-pointer"
                   >
