@@ -386,6 +386,61 @@ public class PaySlipStudioAcceptanceTests
         }
     }
 
+    [Fact]
+    public async Task AdminLogin_AfterFirstTimeSetup_Succeeds()
+    {
+        var dbFile = Path.Combine(Path.GetTempPath(), $"payslip_studio_admin_test_{Guid.NewGuid():N}.db");
+        try
+        {
+            await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureAppConfiguration((_, cfg) =>
+                {
+                    cfg.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["Database:Provider"] = "Sqlite",
+                        ["ConnectionStrings:DefaultConnection"] = $"Data Source={dbFile}"
+                    });
+                });
+            });
+
+            using var client = factory.CreateClient();
+
+            // 1. Check setup status
+            var setupStatusResp = await client.GetAsync("/api/auth/setup-status");
+            Assert.Equal(HttpStatusCode.OK, setupStatusResp.StatusCode);
+
+            // 2. Perform First-Time Administrator Registration
+            var setupResp = await client.PostAsJsonAsync("/api/auth/setup-admin", new
+            {
+                FullName = "Joshua Godson",
+                Username = "JOSHUA",
+                Email = "joshua@organization.org",
+                Password = "Password123!",
+                ConfirmPassword = "Password123!",
+                CompanyName = "FINORA Corp"
+            });
+            var setupBody = await setupResp.Content.ReadAsStringAsync();
+            Assert.True(setupResp.IsSuccessStatusCode, $"Setup failed: {setupResp.StatusCode} - {setupBody}");
+
+            // 3. Authenticate via Admin Gateway using FullName ("Joshua Godson")
+            var adminLoginResp = await client.PostAsJsonAsync("/api/auth/admin-login", new
+            {
+                AdministratorId = "Joshua Godson",
+                Password = "Password123!"
+            });
+            var adminBody = await adminLoginResp.Content.ReadAsStringAsync();
+            Assert.True(adminLoginResp.IsSuccessStatusCode, $"Admin login failed: {adminLoginResp.StatusCode} - {adminBody}");
+        }
+        finally
+        {
+            if (File.Exists(dbFile))
+            {
+                try { File.Delete(dbFile); } catch { }
+            }
+        }
+    }
+
     private class MockHostEnv : Microsoft.AspNetCore.Hosting.IWebHostEnvironment
     {
         public string WebRootPath { get; set; } = Path.GetTempPath();

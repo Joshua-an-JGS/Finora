@@ -31,6 +31,8 @@ export interface PayslipTemplateConfig {
   logoHeightPx: number;
   headerAlignment: 'Left' | 'Center' | 'Split';
   documentTitle: string;
+  payslipTitleAlignment?: 'Left' | 'Center' | 'Right';
+  employeeDetailsSectionHeading?: string;
   periodPresentationPrefix: string;
   showCompanySubtitle: boolean;
   showCompanyAddress: boolean;

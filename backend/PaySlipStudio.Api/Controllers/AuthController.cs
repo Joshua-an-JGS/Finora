@@ -390,21 +390,6 @@ public class AuthController : ControllerBase
                            u.NormalizedEmail == identifier.ToUpper() ||
                            (u.FullName != null && u.FullName.ToLower() == identifier.ToLower()));
 
-            if (user == null)
-            {
-                var adminUsers = await _userManager.GetUsersInRoleAsync(AppRoles.Administrator);
-                user = adminUsers.FirstOrDefault(u =>
-                    string.Equals(u.UserName, identifier, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(u.Email, identifier, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(u.FullName, identifier, StringComparison.OrdinalIgnoreCase) ||
-                    (u.FullName != null && u.FullName.Contains(identifier, StringComparison.OrdinalIgnoreCase)));
-
-                if (user == null && adminUsers.Count == 1)
-                {
-                    user = adminUsers[0];
-                }
-            }
-
             // Constant-time mitigation delay (350ms) to resist timing attacks
             await Task.Delay(350);
 

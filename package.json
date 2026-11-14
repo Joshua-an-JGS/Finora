@@ -18,7 +18,7 @@
     "productName": "FINORA",
     "copyright": "Copyright © 2026 FINORA. Designed and Developed by Joshua Godson.",
     "directories": {
-      "output": "dist_release"
+      "output": "release"
     },
     "publish": [
       {

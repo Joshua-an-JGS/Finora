@@ -27,6 +27,8 @@ public class PayslipTemplateConfig
     public int LogoHeightPx { get; set; } = 48;
     public string HeaderAlignment { get; set; } = "Left"; // "Left", "Center", "Split"
     public string DocumentTitle { get; set; } = "PAYSLIP";
+    public string PayslipTitleAlignment { get; set; } = "Center"; // "Left", "Center", "Right"
+    public string EmployeeDetailsSectionHeading { get; set; } = "EMPLOYEE INFORMATION";
     public string PeriodPresentationPrefix { get; set; } = "For the Month of";
     public bool ShowCompanySubtitle { get; set; } = true;
     public bool ShowCompanyAddress { get; set; } = true;

@@ -366,14 +366,21 @@ export const PayslipA4Paper: React.FC<PayslipA4PaperProps> = ({ doc, scale = 1 }
     const bannerBg = cfg.titleBannerBgColor || subtleOrange;
     const titleColor = cfg.titleBannerTitleColor || textMain;
     const periodColor = cfg.titleBannerPeriodColor || orange;
+    const titleAlign = cfg.payslipTitleAlignment || 'Center';
+    const flexJustify =
+      titleAlign === 'Left' ? 'flex-start' :
+      titleAlign === 'Right' ? 'flex-end' :
+      'center';
     return (
       <div
         key="TitleBanner"
-        className="flex items-baseline justify-between py-2 px-3 rounded-[6px]"
+        className="flex items-baseline py-2 px-3 rounded-[6px]"
         style={{
           backgroundColor: bannerBg,
           borderBottom: `1px solid ${borderGray}`,
           marginBottom: `${sectionGapPx}px`,
+          justifyContent: flexJustify,
+          gap: '1rem',
         }}
       >
         <div

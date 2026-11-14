@@ -1390,11 +1390,29 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
     }
   };
 
-  // Fetch current SMTP configuration whenever Send Payslip modal opens
+  // Fetch current SMTP configuration and auto-populate email fields whenever Send Payslip modal opens
   useEffect(() => {
-    if (!showSendModal) return;
+    if (!showSendModal || !liveResolvedDocument) return;
     setModalError(null);
     setModalSuccessMsg(null);
+
+    // Auto-populate recipient email
+    setEmailRecipient(liveResolvedDocument.employeeEmail || '');
+
+    // Auto-generate resolved subject and body from payroll data
+    const monthName = MONTHS.find((m) => m.value === liveResolvedDocument.payrollMonth)?.label || '';
+    const yearStr = String(liveResolvedDocument.payrollYear);
+    const empName = liveResolvedDocument.employeeName || '';
+    const empCode = liveResolvedDocument.employeeCode || '';
+    const company = liveResolvedDocument.companyName || '';
+
+    setEmailSubject(
+      `Your Payslip for ${monthName} ${yearStr} — ${empName} (${empCode})`
+    );
+    setEmailBody(
+      `Dear ${empName},\n\nPlease find attached your payslip for ${monthName} ${yearStr}.\n\nPlease review the document and contact the Accounts Department if you have any questions regarding your salary details.\n\nRegards,\nAccounts Department\n${company}`
+    );
+
     apiRequest<any>('/api/settings/company')
       .then((s) => {
         const ready = s.emailProviderMode === 'Smtp' && Boolean(s.hasSmtpPasswordConfigured);
@@ -1404,7 +1422,7 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
         // Settings may be restricted for this role; let the server decide on send.
         setSmtpConfigured(true);
       });
-  }, [showSendModal]);
+  }, [showSendModal, liveResolvedDocument]);
 
   const handleSendEmail = async (isTest: boolean) => {
     if (!serverDoc) return;
@@ -4473,7 +4491,45 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                         </div>
 
                         {/* Headings */}
-                        <div className="pt-3 border-t border-[#E5E7EB] grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div className="pt-3 border-t border-[#E5E7EB] space-y-3.5">
+                          {/* Payslip Title Alignment */}
+                          <div className="space-y-1.5">
+                            <label className="block text-[11px] font-medium text-[#6B7280] uppercase tracking-wide">
+                              Payslip Title Alignment
+                            </label>
+                            <div className="flex gap-1.5">
+                              {(['Left', 'Center', 'Right'] as const).map((align) => (
+                                <button
+                                  key={align}
+                                  type="button"
+                                  onClick={() => setStyleEdit({ ...styleEdit, payslipTitleAlignment: align })}
+                                  className={`flex-1 py-1.5 rounded-[6px] text-[11.5px] font-medium border transition-colors cursor-pointer ${
+                                    (styleEdit.payslipTitleAlignment || 'Center') === align
+                                      ? 'bg-[#F47721] border-[#F47721] text-white'
+                                      : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-[#F47721] hover:text-[#F47721]'
+                                  }`}
+                                >
+                                  {align}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Employee Details Section Heading */}
+                          <div className="space-y-1.5">
+                            <label className="block text-[11px] font-medium text-[#6B7280] uppercase tracking-wide">
+                              Employee Details Heading
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="EMPLOYEE INFORMATION"
+                              className="w-full px-2.5 py-1.5 text-[12px] border border-[#E5E7EB] rounded-[6px] focus:outline-none focus:border-[#F47721]"
+                              value={styleEdit.employeeDetailsSectionHeading || ''}
+                              onChange={(e) => setStyleEdit({ ...styleEdit, employeeDetailsSectionHeading: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                           <div>
                             <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
                               Earnings Section Heading
