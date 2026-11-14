@@ -828,25 +828,21 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                         {
                           id: 'SingleMonth',
                           title: 'Single Month',
-                          desc: 'Import one specific month and year',
                           icon: Calendar,
                         },
                         {
                           id: 'FullYear',
                           title: 'Full Year',
-                          desc: 'Process all 12 months for an entire year',
                           icon: CalendarRange,
                         },
                         {
                           id: 'MultipleMonths',
                           title: 'Multiple Months',
-                          desc: 'Select specific multiple months of a year',
                           icon: Layers,
                         },
                         {
                           id: 'AutoDetect',
                           title: 'Auto Detect from Excel',
-                          desc: 'Inspect workbook data & sheets automatically',
                           icon: Sparkles,
                         },
                       ].map((m) => {
@@ -856,23 +852,20 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                           <div
                             key={m.id}
                             onClick={() => setImportMode(m.id as ImportPeriodMode)}
-                            className={`p-4 rounded-[8px] border cursor-pointer transition-all ${
+                            className={`px-3.5 py-2.5 rounded-[8px] border cursor-pointer transition-all flex items-center gap-2.5 ${
                               isSelected
-                                ? 'border-[#F47721] bg-[#FFF3E8]/50 shadow-sm'
-                                : 'border-[#E5E7EB] hover:border-[#F47721]/40 bg-[#FFFFFF]'
+                                ? 'border-[#F47721] bg-[#FFF3E8]/60 shadow-sm ring-1 ring-[#F47721]/30'
+                                : 'border-[#E5E7EB] hover:border-[#F47721]/40 bg-[#FFFFFF] hover:bg-[#F9FAFB]'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`w-7 h-7 rounded-[6px] flex items-center justify-center ${
-                                  isSelected ? 'bg-[#F47721] text-[#FFFFFF]' : 'bg-[#F3F4F6] text-[#6B7280]'
-                                }`}
-                              >
-                                <Icon className="w-4 h-4" />
-                              </div>
-                              <span className="font-semibold text-[13.5px] text-[#1F2937]">{m.title}</span>
+                            <div
+                              className={`w-7 h-7 rounded-[6px] shrink-0 flex items-center justify-center transition-colors ${
+                                isSelected ? 'bg-[#F47721] text-[#FFFFFF]' : 'bg-[#F3F4F6] text-[#6B7280]'
+                              }`}
+                            >
+                              <Icon className="w-3.5 h-3.5" />
                             </div>
-                            <p className="text-[11.5px] text-[#6B7280] mt-2 leading-relaxed">{m.desc}</p>
+                            <span className="font-semibold text-[13px] text-[#1F2937] truncate">{m.title}</span>
                           </div>
                         );
                       })}
