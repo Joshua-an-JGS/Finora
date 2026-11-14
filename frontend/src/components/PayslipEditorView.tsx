@@ -36,7 +36,6 @@ import {
   Building2,
   Table,
   TableProperties,
-  Mail,
   Users,
   Type,
 } from 'lucide-react';
@@ -203,8 +202,6 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
   } | null>(null);
   const [emailManuallyEdited, setEmailManuallyEdited] = useState(false);
   const [lastPopulatedRecordId, setLastPopulatedRecordId] = useState<string | null>(null);
-  const [showSaveEmailTemplateModal, setShowSaveEmailTemplateModal] = useState(false);
-  const [newEmailTemplateName, setNewEmailTemplateName] = useState('');
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSuccessMsg, setModalSuccessMsg] = useState<string | null>(null);
@@ -1447,45 +1444,6 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
         setSmtpConfigured(true);
       });
   }, [showSendModal, liveResolvedDocument, lastPopulatedRecordId, emailManuallyEdited, getDynamicDefaultEmailSubject, getDynamicDefaultEmailBody]);
-
-  const handleResetEmailToDefault = () => {
-    if (!liveResolvedDocument) return;
-    setEmailRecipient(liveResolvedDocument.employeeEmail || '');
-    setEmailSubject(getDynamicDefaultEmailSubject(liveResolvedDocument));
-    setEmailBody(getDynamicDefaultEmailBody(liveResolvedDocument));
-    setEmailManuallyEdited(false);
-    setModalSuccessMsg('Reset email subject and message to dynamic default.');
-    setTimeout(() => setModalSuccessMsg(null), 3000);
-  };
-
-  const handleSaveCustomEmailTemplate = async () => {
-    if (!newEmailTemplateName.trim()) {
-      setModalError('Please enter a template name.');
-      return;
-    }
-    setSaving(true);
-    try {
-      const created = await apiRequest<EmailTemplateItem>('/api/templates/email', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: newEmailTemplateName.trim(),
-          subjectTemplate: emailSubject,
-          bodyTemplate: emailBody,
-          isDefault: false,
-        }),
-      });
-      setEmailTemplates((prev) => [...prev, created]);
-      setSelectedEmailTemplateId(created.id);
-      setShowSaveEmailTemplateModal(false);
-      setNewEmailTemplateName('');
-      setModalSuccessMsg(`Template '${created.name}' saved successfully!`);
-      setTimeout(() => setModalSuccessMsg(null), 3000);
-    } catch (err: any) {
-      setModalError(err.message || 'Failed to save email template.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleSendEmail = async (isTest: boolean) => {
     if (!serverDoc || !liveResolvedDocument) return;
@@ -5968,35 +5926,9 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   />
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11.5px] font-medium text-[#6B7280]">
-                      Email Template
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handleResetEmailToDefault}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B7280] hover:text-[#F47721] transition-colors cursor-pointer"
-                        title="Reset subject and message body to dynamic default"
-                      >
-                        <RotateCcw className="w-3 h-3 text-[#F47721]" />
-                        <span>Reset to Default</span>
-                      </button>
-                      <span className="text-[#D1D5DB]">|</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewEmailTemplateName('');
-                          setShowSaveEmailTemplateModal(true);
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B7280] hover:text-[#F47721] transition-colors cursor-pointer"
-                        title="Save current email as a template preset"
-                      >
-                        <Save className="w-3 h-3 text-[#F47721]" />
-                        <span>Save as Template</span>
-                      </button>
-                    </div>
-                  </div>
+                  <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
+                    Email Template
+                  </label>
                   <select
                     value={selectedEmailTemplateId}
                     onChange={(e) => {
@@ -6049,48 +5981,6 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   className="w-full p-3 text-[13px] border border-[#E5E7EB] rounded-[7px]"
                 />
               </div>
-
-              {emailPreviewData && (
-                <div className="p-3.5 rounded-[8px] bg-[#FFF8F3] border border-[#F47721]/30 text-[12px] space-y-2.5">
-                  <div className="flex items-center justify-between border-b border-[#F47721]/20 pb-1.5">
-                    <span className="font-semibold text-[#1F2937] flex items-center gap-1.5">
-                      <Eye className="w-3.5 h-3.5 text-[#F47721]" />
-                      Resolved Preview &amp; Attachment
-                    </span>
-                    <span className="text-[10.5px] font-medium text-[#F47721] bg-white px-2 py-0.5 rounded border border-[#F47721]/20">
-                      Live Preview
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="font-semibold text-[#6B7280] block text-[11px] uppercase tracking-wide mb-0.5">
-                      Subject:
-                    </span>
-                    <div className="p-2 bg-white rounded-[6px] border border-[#E5E7EB] font-medium text-[#1F2937] text-[12px]">
-                      {emailPreviewData.resolvedSubject}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="font-semibold text-[#6B7280] block text-[11px] uppercase tracking-wide mb-0.5">
-                      Email Preview:
-                    </span>
-                    <div className="p-2.5 bg-white rounded-[6px] border border-[#E5E7EB] text-[#1F2937] text-[12px] whitespace-pre-wrap leading-relaxed">
-                      {emailPreviewData.resolvedBody}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1 border-t border-[#F47721]/15 text-[#6B7280]">
-                    <span className="font-semibold text-[#1F2937] text-[11px] uppercase tracking-wide">
-                      PDF Attachment:
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded border border-[#E5E7EB] text-[#F47721] font-semibold text-[11.5px]">
-                      <FileText className="w-3.5 h-3.5 text-[#F47721]" />
-                      {emailPreviewData.attachmentName}
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="px-5 py-3.5 bg-[#F8F9FA] border-t border-[#E5E7EB] flex items-center justify-between">
@@ -6119,75 +6009,6 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                   {saving ? 'Sending...' : 'Send Payslip'}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* SAVE CUSTOM EMAIL TEMPLATE MODAL */}
-      {showSaveEmailTemplateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-[12px] shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#FFF4E8] flex items-center justify-center text-[#F47721]">
-                  <Mail className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-[16px] font-bold text-[#1F2937]">Save Email Template</h3>
-                  <p className="text-[12px] text-[#6B7280]">Save subject and message body as an email template preset</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowSaveEmailTemplateModal(false)}
-                className="text-[#9CA3AF] hover:text-[#1F2937] p-1 rounded-md transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[11.5px] font-medium text-[#6B7280] mb-1">
-                  Template Name
-                </label>
-                <input
-                  type="text"
-                  value={newEmailTemplateName}
-                  onChange={(e) => setNewEmailTemplateName(e.target.value)}
-                  placeholder="e.g. Accounts Department Monthly Statement"
-                  className="w-full px-3 py-2 text-[13px] border border-[#D1D5DB] rounded-[7px] focus:outline-none focus:border-[#F47721] focus:ring-1 focus:ring-[#F47721]"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSaveCustomEmailTemplate();
-                    }
-                  }}
-                />
-              </div>
-              <p className="text-[11px] text-[#6B7280]">
-                Placeholders such as &#123;&#123;EmployeeName&#125;&#125;, &#123;&#123;EmployeeID&#125;&#125;, &#123;&#123;PayrollMonth&#125;&#125;, &#123;&#123;PayrollYear&#125;&#125;, and &#123;&#123;CompanyName&#125;&#125; are resolved dynamically when generating payslip emails.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E5E7EB]">
-              <button
-                type="button"
-                onClick={() => setShowSaveEmailTemplateModal(false)}
-                className="px-3.5 py-2 text-[12.5px] font-medium text-[#4B5563] hover:text-[#1F2937] border border-[#E5E7EB] rounded-[7px] bg-[#FFFFFF] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!newEmailTemplateName.trim() || saving}
-                onClick={handleSaveCustomEmailTemplate}
-                className="px-4 py-2 text-[12.5px] font-semibold text-white bg-[#F47721] hover:bg-[#e06714] rounded-[7px] shadow-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-              >
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                <span>Save Template</span>
-              </button>
             </div>
           </div>
         </div>
