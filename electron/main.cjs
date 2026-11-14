@@ -168,7 +168,7 @@ let autoUpdater = null;
 try {
   const updaterModule = require('electron-updater');
   autoUpdater = updaterModule.autoUpdater;
-  autoUpdater.autoDownload = false;
+  autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowDowngrade = false;
   logBoot('electron-updater initialized successfully');

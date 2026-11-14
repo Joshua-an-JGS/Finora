@@ -19,7 +19,9 @@ import {
   Settings,
   ArrowRight,
   Check,
-  AlertCircle
+  AlertCircle,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
 import type { UpdateStatus, ReleaseHistoryItem } from '../types/payroll';
@@ -35,10 +37,52 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
 
   // Check for updates state within About page
   const [checking, setChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<{ message: string; isError?: boolean } | null>(null);
+  const [checkResult, setCheckResult] = useState<{
+    message: string;
+    isError?: boolean;
+    isUpdateAvailable?: boolean;
+    latestVersion?: string;
+    releaseNotes?: string;
+  } | null>(null);
+
+  // Live updater download states
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [readyToInstall, setReadyToInstall] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
+
+    // Listen to electron updater events
+    const electronAPI = (window as any).electronAPI;
+    let unsubUpdater: (() => void) | undefined;
+    if (electronAPI?.updater?.onEvent) {
+      unsubUpdater = electronAPI.updater.onEvent((evt: any) => {
+        if (evt.type === 'available') {
+          setCheckResult({
+            message: `A new update is available: v${evt.version}!`,
+            isError: false,
+            isUpdateAvailable: true,
+            latestVersion: evt.version,
+            releaseNotes: typeof evt.releaseNotes === 'string' ? evt.releaseNotes : undefined,
+          });
+        } else if (evt.type === 'progress') {
+          setDownloading(true);
+          setDownloadProgress(evt.percent || 0);
+        } else if (evt.type === 'downloaded') {
+          setDownloading(false);
+          setReadyToInstall(true);
+        } else if (evt.type === 'error') {
+          setDownloading(false);
+          setDownloadError(evt.message || 'Download encountered an issue.');
+        }
+      });
+    }
+
+    return () => {
+      if (unsubUpdater) unsubUpdater();
+    };
   }, []);
 
   const loadData = async () => {
@@ -48,16 +92,62 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
         apiRequest<ReleaseHistoryItem[]>('/api/updates/history'),
       ]);
 
-      if (statusRes.status === 'fulfilled') setUpdateStatus(statusRes.value);
+      if (statusRes.status === 'fulfilled') {
+        const val = statusRes.value;
+        setUpdateStatus(val);
+        if (val?.isUpdateAvailable && val?.latestVersion) {
+          setCheckResult({
+            message: `A new update is available: v${val.latestVersion}!`,
+            isError: false,
+            isUpdateAvailable: true,
+            latestVersion: val.latestVersion,
+            releaseNotes: val.releaseNotes,
+          });
+        }
+      }
       if (historyRes.status === 'fulfilled') setHistory(historyRes.value);
     } catch {
       // Fallback defaults
     }
   };
 
+  const handleDownloadUpdate = async () => {
+    setDownloading(true);
+    setDownloadProgress(0);
+    setDownloadError(null);
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.updater?.download) {
+      try {
+        const res = await electronAPI.updater.download();
+        if (res && res.success === false) {
+          setDownloading(false);
+          setDownloadError(res.message || 'Could not initiate background download.');
+          window.open('https://github.com/Joshua-an-JGS/Finora/releases/latest/download/FINORA_Setup.exe', '_blank');
+        }
+      } catch (err: any) {
+        setDownloading(false);
+        setDownloadError(err?.message || 'Download error occurred.');
+        window.open('https://github.com/Joshua-an-JGS/Finora/releases/latest/download/FINORA_Setup.exe', '_blank');
+      }
+    } else {
+      setDownloading(false);
+      window.open('https://github.com/Joshua-an-JGS/Finora/releases/latest/download/FINORA_Setup.exe', '_blank');
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.updater?.install) {
+      await electronAPI.updater.install();
+    } else {
+      alert('In packaged desktop mode, FINORA will cleanly restart and install the update.');
+    }
+  };
+
   const handleManualCheck = async () => {
     setChecking(true);
     setCheckResult(null);
+    setDownloadError(null);
     try {
       // Check via Electron updater first if available
       const electronAPI = (window as any).electronAPI;
@@ -82,12 +172,16 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
       } else if (res.isUpdateAvailable) {
         setCheckResult({
           message: `A new update is available: v${res.latestVersion}!`,
-          isError: false
+          isError: false,
+          isUpdateAvailable: true,
+          latestVersion: res.latestVersion,
+          releaseNotes: res.releaseNotes,
         });
       } else {
         setCheckResult({
           message: `FINORA is up to date. You are running the latest version (v${res.currentVersion || updateStatus?.currentVersion || '1.0.3'}).`,
-          isError: false
+          isError: false,
+          isUpdateAvailable: false,
         });
       }
     } catch {
@@ -173,17 +267,101 @@ export const AboutView: React.FC<AboutViewProps> = ({ onNavigateToSettings }) =>
         </div>
 
         {checkResult && (
-          <div className={`mb-3 p-2.5 rounded-[7px] text-[12px] font-medium flex items-center gap-2 ${
+          <div className={`mb-4 p-4 rounded-[8px] flex flex-col gap-3 transition-all ${
             checkResult.isError
               ? 'bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B]'
               : 'bg-[#FFF3E8] border border-[#F47721]/30 text-[#1F2937]'
           }`}>
-            {checkResult.isError ? (
-              <AlertCircle className="w-4 h-4 text-[#DC2626] shrink-0" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 text-[#F47721] shrink-0" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                {checkResult.isError ? (
+                  <AlertCircle className="w-5 h-5 text-[#DC2626] shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-[#F47721] shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold text-[#1F2937]">
+                    {checkResult.message}
+                  </div>
+                  {checkResult.isUpdateAvailable && !readyToInstall && !downloading && (
+                    <div className="text-[12px] text-[#6B7280] mt-0.5">
+                      FINORA {checkResult.latestVersion ? `v${checkResult.latestVersion}` : ''} includes important improvements. Click below to download and install.
+                    </div>
+                  )}
+                  {readyToInstall && (
+                    <div className="text-[12px] text-[#059669] font-medium mt-0.5">
+                      Update has been downloaded successfully and is ready to apply!
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons on right side */}
+              {checkResult.isUpdateAvailable && !downloading && !readyToInstall && (
+                <div className="flex items-center gap-2 shrink-0 sm:self-center">
+                  <button
+                    type="button"
+                    onClick={handleDownloadUpdate}
+                    className="px-4 py-2 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download &amp; Install</span>
+                  </button>
+                  <a
+                    href="https://github.com/Joshua-an-JGS/Finora/releases/latest/download/FINORA_Setup.exe"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-2 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] hover:border-[#F47721] text-[#4B5563] hover:text-[#F47721] text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Direct Download from GitHub"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Direct Link</span>
+                  </a>
+                </div>
+              )}
+
+              {readyToInstall && (
+                <div className="flex items-center gap-2 shrink-0 sm:self-center">
+                  <button
+                    type="button"
+                    onClick={handleInstallUpdate}
+                    className="px-4 py-2 rounded-[7px] bg-[#059669] hover:bg-[#047857] text-[#FFFFFF] text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Install &amp; Restart Now</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Live Progress Bar when downloading */}
+            {downloading && (
+              <div className="mt-1 pt-2 border-t border-[#F47721]/20 space-y-2">
+                <div className="flex items-center justify-between text-[12px] font-semibold text-[#1F2937]">
+                  <span className="flex items-center gap-2 text-[#F47721]">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Downloading update package...
+                  </span>
+                  <span className="font-mono">{downloadProgress}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-[#E5E7EB] overflow-hidden">
+                  <div
+                    className="h-full bg-[#F47721] rounded-full transition-all duration-300"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-[#6B7280]">
+                  Please keep FINORA open. The update will be ready to install once the download completes.
+                </p>
+              </div>
             )}
-            <span>{checkResult.message}</span>
+
+            {downloadError && (
+              <div className="text-[11.5px] text-[#DC2626] font-medium flex items-center gap-1.5 mt-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{downloadError} — You can download directly using the button above.</span>
+              </div>
+            )}
           </div>
         )}
 

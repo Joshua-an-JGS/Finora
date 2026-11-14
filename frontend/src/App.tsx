@@ -24,7 +24,7 @@ import {
   CheckCircle2,
   User,
   X,
-  ArrowRight,
+  Download,
 } from 'lucide-react';
 import {
   apiRequest,
@@ -255,6 +255,26 @@ export const App: React.FC = () => {
     };
   }, [user]);
 
+
+  const handleDownloadUpdateFromToast = async () => {
+    setUpdateNotification((prev) => (prev ? { ...prev, downloading: true, progress: 0 } : null));
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.updater?.download) {
+      try {
+        const res = await electronAPI.updater.download();
+        if (res && res.success === false) {
+          setUpdateNotification((prev) => (prev ? { ...prev, downloading: false } : null));
+          window.open('https://github.com/Joshua-an-JGS/Finora/releases/latest/download/FINORA_Setup.exe', '_blank');
+        }
+      } catch (err) {
+        setUpdateNotification((prev) => (prev ? { ...prev, downloading: false } : null));
+        window.open('https://github.com/Joshua-an-JGS/Finora/releases/latest/download/FINORA_Setup.exe', '_blank');
+      }
+    } else {
+      setUpdateNotification((prev) => (prev ? { ...prev, downloading: false } : null));
+      window.open('https://github.com/Joshua-an-JGS/Finora/releases/latest/download/FINORA_Setup.exe', '_blank');
+    }
+  };
 
   const handleInstallUpdateFromBanner = async () => {
     const electronAPI = (window as any).electronAPI;
@@ -826,10 +846,7 @@ export const App: React.FC = () => {
             >
               <div
                 className="flex items-start justify-between gap-3 cursor-pointer group"
-                onClick={() => {
-                  setActiveNav('about');
-                  setUpdateNotification(null);
-                }}
+                onClick={() => setActiveNav('about')}
                 title="Click to view update details in About page"
               >
                 <div className="flex items-start gap-3 min-w-0">
@@ -841,12 +858,12 @@ export const App: React.FC = () => {
                       <span className="text-[13.5px] font-bold text-[#1F2937] group-hover:text-[#F47721] transition-colors">
                         Update Available
                       </span>
-                      <span className="px-1.5 py-0.5 rounded font-mono text-[10.5px] font-bold bg-[#FFF3E8] text-[#F47721] border border-[#F47721]/30">
+                      <span className="font-mono text-[12px] font-bold text-[#F47721]">
                         v{updateNotification.version}
                       </span>
                     </div>
                     <p className="text-[12px] text-[#6B7280] mt-1 leading-snug">
-                      FINORA v{updateNotification.version} is ready with enhancements. Click to review and install.
+                      FINORA v{updateNotification.version} is ready with enhancements.
                     </p>
                   </div>
                 </div>
@@ -873,7 +890,7 @@ export const App: React.FC = () => {
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       Downloading update...
                     </span>
-                    <span>{updateNotification.progress || 0}%</span>
+                    <span className="font-mono">{updateNotification.progress || 0}%</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-[#E5E7EB] overflow-hidden">
                     <div
@@ -904,21 +921,18 @@ export const App: React.FC = () => {
                 <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveNav('about');
-                      setUpdateNotification(null);
-                    }}
+                    onClick={handleDownloadUpdateFromToast}
                     className="flex-1 py-1.5 px-3 rounded-[7px] bg-[#F47721] hover:bg-[#E06612] text-[#FFFFFF] text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                   >
-                    <span>View &amp; Update</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download &amp; Install</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setUpdateNotification(null)}
+                    onClick={() => setActiveNav('about')}
                     className="py-1.5 px-2.5 rounded-[7px] bg-[#FFFFFF] border border-[#E5E7EB] text-[#6B7280] hover:text-[#1F2937] text-[12px] font-medium transition-colors cursor-pointer"
                   >
-                    Dismiss
+                    Details
                   </button>
                 </div>
               )}
