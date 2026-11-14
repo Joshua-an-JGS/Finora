@@ -47,6 +47,7 @@ token.txt
 # Temporary & Test Files
 *.log
 *.tmp
+*.xlsx
 test_*.pdf
 ~$*
 0.26.0
