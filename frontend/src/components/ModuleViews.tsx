@@ -1948,7 +1948,7 @@ export const ReportsAndExportsView: React.FC<{
               Export your historical payroll data in organized year-wise Excel workbooks.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FFF3E8] border border-[#FED7AA] text-[12px] font-semibold text-[#F47721]">
+          <div className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#F47721]">
             <CheckCircle2 className="w-4 h-4 text-[#F47721]" />
             <span>Authoritative Processed Records Source</span>
           </div>
@@ -2922,14 +2922,14 @@ export const UserManagementView: React.FC<{
                     {/* Username & Email */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-[#FFF3E8] border border-[#FED7AA] text-[#F47721] font-semibold flex items-center justify-center text-[12px] shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-[#F47721] text-[#FFFFFF] font-bold flex items-center justify-center text-[12.5px] shrink-0 shadow-xs">
                           {(u.fullName || u.userName || 'U').charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <div className="font-semibold text-[#1F2937] flex items-center gap-1.5">
                             <span>{u.userName}</span>
                             {isSelf && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#FFF3E8] text-[#F47721] border border-[#FED7AA]">
+                              <span className="text-[11px] font-semibold text-[#F47721]">
                                 You
                               </span>
                             )}
