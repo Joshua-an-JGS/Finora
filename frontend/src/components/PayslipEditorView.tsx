@@ -5812,10 +5812,8 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                                   {item.label}
                                 </span>
                                 <span
-                                  className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
-                                    item.isActive
-                                      ? 'text-[#065F46] bg-[#ECFDF5] border-[#A7F3D0]'
-                                      : 'text-[#6B7280] bg-[#F3F4F6] border-[#E5E7EB]'
+                                  className={`text-[11px] font-medium ${
+                                    item.isActive ? 'text-[#F47721]' : 'text-[#9CA3AF]'
                                   }`}
                                 >
                                   {item.isActive ? 'Active' : 'Disabled'}
@@ -5823,12 +5821,6 @@ export const PayslipEditorView: React.FC<PayslipEditorViewProps> = ({
                               </div>
                             );
                           })}
-                        </div>
-                        <div className="p-2.5 rounded-[6px] bg-[#F9FAFB] border border-[#E5E7EB] text-[11px] text-[#6B7280] space-y-1">
-                          <span className="font-semibold text-[#1F2937] block">A4 Document Print Render Sequence:</span>
-                          <span className="block leading-relaxed">
-                            1. Header &rarr; 2. Payslip Main Heading &rarr; 3. Employee Details &rarr; 4. Salary Tables &rarr; 5. Custom Tables (if any) &rarr; 6. Custom Fields &rarr; 7. Totals Summary &rarr; 8. Net Salary Banner &rarr; 9. Signature Block &rarr; 10. Footer Notes
-                          </span>
                         </div>
                         <div className="pt-2 flex items-center justify-between border-t border-[#E5E7EB]">
                           <span className="text-[11.5px] text-[#6B7280]">
